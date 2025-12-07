@@ -33,7 +33,7 @@ export default function SignupPage() {
   useEffect(() => {
     if (!loading && user && !isGoogleSignupInProgress) {
         if (!isGoogleSetup) {
-            router.push('/');
+            router.push('/homepage');
         }
         // We defer the pre-filling to avoid synchronous state updates during effect execution
         // or we could use a separate effect that only runs once on mount/user change
@@ -90,7 +90,7 @@ export default function SignupPage() {
                 });
 
                 showPopupToast('Profile updated successfully!');
-                router.push('/');
+                router.push('/homepage');
             } catch (error) {
                  if (error instanceof Error) {
                     showPopupToast(error.message);
@@ -128,7 +128,7 @@ export default function SignupPage() {
       });
 
       showPopupToast('Signup successful!');
-      router.push('/');
+      router.push('/homepage');
     } catch (error) {
         if (error instanceof Error) {
             showPopupToast(error.message);
@@ -153,7 +153,7 @@ export default function SignupPage() {
         // Actually, we should force the "setup mode" if new user
         router.push('/signup?google_setup=true');
       } else {
-         router.push('/');
+         router.push('/homepage');
       }
     } catch (error) {
         setIsGoogleSignupInProgress(false);

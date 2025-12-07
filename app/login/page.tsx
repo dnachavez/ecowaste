@@ -21,7 +21,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!loading && user && !isGoogleLoginInProgress) {
-      router.push('/');
+      router.push('/homepage');
     }
   }, [user, loading, router, isGoogleLoginInProgress]);
 
@@ -46,7 +46,7 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       showPopupToast('Login successful!');
-      router.push('/'); // Redirect to home page
+      router.push('/homepage'); // Redirect to home page
     } catch (error) {
         if (error instanceof Error) {
             showPopupToast(error.message);
@@ -68,7 +68,7 @@ export default function LoginPage() {
       if (additionalUserInfo?.isNewUser) {
         router.push('/signup?google_setup=true');
       } else {
-        router.push('/');
+        router.push('/homepage');
       }
     } catch (error) {
         setIsGoogleLoginInProgress(false);
