@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../../context/AuthContext';
 import styles from './projects.module.css';
 
 // Mock Data Interfaces
@@ -47,6 +49,8 @@ const INITIAL_PROJECTS: Project[] = [
 ];
 
 export default function ProjectsPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   // State
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [view, setView] = useState<'list' | 'details'>('list');
@@ -235,19 +239,9 @@ export default function ProjectsPage() {
     }, 1500);
   };
 
-  // Start new project (simple mock)
+  // Start new project
   const handleStartProject = () => {
-    const newProject: Project = {
-      id: Date.now().toString(),
-      title: 'New Project',
-      description: 'Describe your new recycling project here...',
-      created_at: new Date().toISOString().split('T')[0],
-      status: 'collecting',
-      materials: [],
-      steps: []
-    };
-    setProjects([newProject, ...projects]);
-    handleViewDetails(newProject);
+    router.push('/start-project');
   };
 
   // Filtering
@@ -263,26 +257,40 @@ export default function ProjectsPage() {
 
   return (
     <div className={styles.container}>
+      {/* Load Font Awesome */}
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&amp;family=Open+Sans&amp;display=swap" rel="stylesheet" />
+
       {/* Header */}
       <header className={styles.header}>
-        <div className={styles['logo-container']}>
+        <div className={styles.logoContainer}>
           <div className={styles.logo}>
             <Image src="/ecowaste_logo.png" alt="EcoWaste Logo" width={70} height={70} />
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>EcoWaste</h1>
         </div>
         <div 
-          className={`${styles['user-profile']} ${userProfileActive ? styles.active : ''}`}
+          className={`${styles.userProfile} ${userProfileActive ? styles.active : ''}`}
           onClick={() => setUserProfileActive(!userProfileActive)}
         >
-          <div className={styles['profile-pic']}>D</div>
-          <span className={styles['profile-name']}>Dan Glyde</span>
+          <div className={styles.profilePic}>
+            {user?.photoURL ? (
+              <img 
+                src={user.photoURL} 
+                alt="Profile" 
+                style={{width: '100%', height: '100%', objectFit: 'cover'}} 
+              />
+            ) : (
+              (user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'U')
+            )}
+          </div>
+          <span className={styles.profileName}>{user?.displayName || 'User'}</span>
           <i className={`fas fa-chevron-down ${styles['dropdown-arrow']}`}></i>
-          <div className={styles['profile-dropdown']}>
-            <Link href="/profile" className={styles['dropdown-item']}><i className="fas fa-user"></i> My Profile</Link>
-            <a href="#" className={styles['dropdown-item']}><i className="fas fa-cog"></i> Settings</a>
-            <div className={styles['dropdown-divider']}></div>
-            <Link href="/logout" className={styles['dropdown-item']}><i className="fas fa-sign-out-alt"></i> Logout</Link>
+          <div className={styles.profileDropdown}>
+            <Link href="/profile" className={styles.dropdownItem}><i className="fas fa-user"></i> My Profile</Link>
+            <a href="#" className={styles.dropdownItem}><i className="fas fa-cog"></i> Settings</a>
+            <div className={styles.dropdownDivider}></div>
+            <Link href="/logout" className={styles.dropdownItem}><i className="fas fa-sign-out-alt"></i> Logout</Link>
           </div>
         </div>
       </header>
