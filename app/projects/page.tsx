@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../../context/AuthContext';
+import Header from '../../components/Header';
+import Sidebar from '../../components/Sidebar';
+import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './projects.module.css';
 
 // Mock Data Interfaces
@@ -33,6 +33,10 @@ interface Project {
   steps: Step[];
 }
 
+const generateId = () => {
+  return Date.now().toString() + Math.random().toString(36).substring(2, 11);
+};
+
 // Initial Mock Data
 const INITIAL_PROJECTS: Project[] = [
   {
@@ -50,7 +54,7 @@ const INITIAL_PROJECTS: Project[] = [
 
 export default function ProjectsPage() {
   const router = useRouter();
-  const { user } = useAuth();
+
   // State
   const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
   const [view, setView] = useState<'list' | 'details'>('list');
@@ -74,7 +78,6 @@ export default function ProjectsPage() {
   const [newStepInstructions, setNewStepInstructions] = useState('');
 
   // UI State
-  const [userProfileActive, setUserProfileActive] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackText, setFeedbackText] = useState('');
@@ -148,7 +151,7 @@ export default function ProjectsPage() {
   const handleAddMaterial = () => {
     if (currentProject && newMaterialName && newMaterialUnit) {
       const newMaterial: Material = {
-        id: Date.now().toString(),
+        id: generateId(),
         name: newMaterialName,
         unit: newMaterialUnit,
         is_found: false
@@ -184,7 +187,7 @@ export default function ProjectsPage() {
   const handleAddStep = () => {
     if (currentProject && newStepTitle && newStepInstructions) {
       const newStep: Step = {
-        id: Date.now().toString(),
+        id: generateId(),
         step_number: currentProject.steps.length + 1,
         title: newStepTitle,
         instructions: newStepInstructions,
@@ -256,58 +259,10 @@ export default function ProjectsPage() {
   });
 
   return (
+    <ProtectedRoute>
     <div className={styles.container}>
-      {/* Load Font Awesome */}
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&amp;family=Open+Sans&amp;display=swap" rel="stylesheet" />
-
-      {/* Header */}
-      <header className={styles.header}>
-        <div className={styles.logoContainer}>
-          <div className={styles.logo}>
-            <Image src="/ecowaste_logo.png" alt="EcoWaste Logo" width={70} height={70} />
-          </div>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>EcoWaste</h1>
-        </div>
-        <div 
-          className={`${styles.userProfile} ${userProfileActive ? styles.active : ''}`}
-          onClick={() => setUserProfileActive(!userProfileActive)}
-        >
-          <div className={styles.profilePic}>
-            {user?.photoURL ? (
-              <img 
-                src={user.photoURL} 
-                alt="Profile" 
-                style={{width: '100%', height: '100%', objectFit: 'cover'}} 
-              />
-            ) : (
-              (user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'U')
-            )}
-          </div>
-          <span className={styles.profileName}>{user?.displayName || 'User'}</span>
-          <i className={`fas fa-chevron-down ${styles['dropdown-arrow']}`}></i>
-          <div className={styles.profileDropdown}>
-            <Link href="/profile" className={styles.dropdownItem}><i className="fas fa-user"></i> My Profile</Link>
-            <a href="#" className={styles.dropdownItem}><i className="fas fa-cog"></i> Settings</a>
-            <div className={styles.dropdownDivider}></div>
-            <Link href="/logout" className={styles.dropdownItem}><i className="fas fa-sign-out-alt"></i> Logout</Link>
-          </div>
-        </div>
-      </header>
-
-      {/* Sidebar */}
-      <aside className={styles.sidebar}>
-        <nav>
-          <ul>
-            <li><Link href="/homepage"><i className="fas fa-home"></i>Home</Link></li>
-            <li><Link href="/browse"><i className="fas fa-search"></i>Browse</Link></li>
-            <li><Link href="/achievements"><i className="fas fa-star"></i>Achievements</Link></li>
-            <li><Link href="/leaderboard"><i className="fas fa-trophy"></i>Leaderboard</Link></li>
-            <li><Link href="/projects" className={styles.active}><i className="fas fa-recycle"></i>Projects</Link></li>
-            <li><Link href="/donations"><i className="fas fa-hand-holding-heart"></i>Donations</Link></li>
-          </ul>
-        </nav>
-      </aside>
+      <Header />
+      <Sidebar />
 
       {/* Main Content */}
       <main className={styles['main-content']}>
@@ -640,5 +595,6 @@ export default function ProjectsPage() {
       {/* Font Awesome CDN (Temporary approach, should ideally be in layout or imported) */}
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     </div>
+    </ProtectedRoute>
   );
 }

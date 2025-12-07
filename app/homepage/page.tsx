@@ -1,34 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
-import { signOut } from 'firebase/auth';
-import { auth } from '../../lib/firebase';
+import Header from '../../components/Header';
+import Sidebar from '../../components/Sidebar';
+import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './homepage.module.css';
 
 export default function Homepage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('donations');
   const [openComments, setOpenComments] = useState<Record<number, boolean>>({});
-
-  // Protect the route
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push('/');
-    } catch (error) {
-      console.error('Failed to log out', error);
-    }
-  };
 
   const toggleComments = (id: number) => {
     setOpenComments(prev => ({
@@ -36,14 +19,6 @@ export default function Homepage() {
       [id]: !prev[id]
     }));
   };
-
-  if (loading) {
-    return <div className={styles.container}>Loading...</div>;
-  }
-
-  if (!user) {
-    return null; // Will redirect in useEffect
-  }
 
   const donations = [
     {
@@ -124,47 +99,11 @@ export default function Homepage() {
   ];
 
   return (
+    <ProtectedRoute>
     <div className={styles.container}>
       {/* Load Font Awesome */}
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-      <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&amp;family=Open+Sans&amp;display=swap" rel="stylesheet" />
-
-      <header className={styles.header}>
-        <div className={styles.logoContainer}>
-          <div className={styles.logo}>
-            <img src="/ecowaste_logo.png" alt="EcoWaste Logo" />
-          </div>
-          <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 900, fontSize: '24px' }}>EcoWaste</h1>
-        </div>
-        <div className={styles.userProfile}>
-          <div className={styles.profilePic}>
-            {user.photoURL ? <img src={user.photoURL} alt="Profile" style={{width: '100%', height: '100%', objectFit: 'cover'}} /> : (user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U')}
-          </div>
-          <span className={styles.profileName}>{user.displayName || 'User'}</span>
-          <i className={`fas fa-chevron-down ${styles.dropdownArrow}`}></i>
-          <div className={styles.profileDropdown}>
-            <Link href="/profile" className={styles.dropdownItem}><i className="fas fa-user"></i> My Profile</Link>
-            <Link href="/settings" className={styles.dropdownItem}><i className="fas fa-cog"></i> Settings</Link>
-            <div className={styles.dropdownDivider}></div>
-            <button onClick={handleLogout} className={styles.dropdownItem} style={{width: '100%', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit'}}>
-                <i className="fas fa-sign-out-alt"></i> Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <aside className={styles.sidebar}>
-        <nav>
-          <ul>
-            <li><Link href="/homepage" className={styles.active}><i className="fas fa-home"></i>Home</Link></li>
-            <li><Link href="/browse"><i className="fas fa-search"></i>Browse</Link></li>
-            <li><Link href="/achievements"><i className="fas fa-star"></i>Achievements</Link></li>
-            <li><Link href="/leaderboard"><i className="fas fa-trophy"></i>Leaderboard</Link></li>
-            <li><Link href="/projects"><i className="fas fa-recycle"></i>Projects</Link></li>
-            <li><Link href="/donations"><i className="fas fa-hand-holding-heart"></i>Donations</Link></li>
-          </ul>
-        </nav>
-      </aside>
+      <Header />
+      <Sidebar />
 
       <main className={styles.mainContent}>
         <div className={styles.welcomeCard}>
@@ -345,5 +284,6 @@ export default function Homepage() {
           </div>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

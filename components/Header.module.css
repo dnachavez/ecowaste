@@ -1,0 +1,114 @@
+:root {
+  --primary-green: #82AA52;
+  --dark-green: #6d8f45;
+  --light-green: #F6FFEB;
+  --accent-green: #2e8b57;
+}
+
+.header {
+  grid-column: 1 / -1;
+  background-color: #82AA52;
+  color: white;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  min-height: 80px;
+  height: 90px;
+}
+
+.logoContainer {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  height: 100%;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 10px 0;
+}
+
+.logo img {
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.logo img:hover {
+  transform: scale(1.05);
+}
+
+.userProfile {
+  display: flex;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+}
+
+.profilePic {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  overflow: hidden;
+  background-color: #3d6a06;
+  color: white;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.profileName {
+  font-weight: 600;
+  margin-right: 5px;
+  font-size: 16px;
+}
+
+.profileDropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: white;
+  border-radius: 5px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  width: 200px;
+  z-index: 100;
+  display: none;
+  overflow: hidden;
+}
+
+.userProfile:hover .profileDropdown {
+  display: block;
+}
+
+.dropdownArrow {
+  transition: transform 0.3s;
+}
+
+.dropdownItem {
+  padding: 10px 15px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.dropdownItem:hover {
+  background-color: #f5f5f5;
+}
+
+.dropdownDivider {
+    height: 1px;
+    background-color: #eee;
+    margin: 5px 0;
+}
