@@ -1,0 +1,49 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mountainGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a7c59;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d4a35;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="badgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#82AA52;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5a7c3a;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="sunGradient" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:0.8" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Badge Background Circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#badgeGradient)" stroke="#2d4a35" stroke-width="3"/>
+  
+  <!-- Inner Circle -->
+  <circle cx="64" cy="64" r="52" fill="#F6FFEB" opacity="0.3"/>
+  
+  <!-- Mountain Range (Sierra Madre) -->
+  <path d="M 20 90 L 35 60 L 50 75 L 65 45 L 80 65 L 95 50 L 108 70 L 108 90 Z" 
+        fill="url(#mountainGradient)" stroke="#1a3a25" stroke-width="1.5"/>
+  
+  <!-- Additional Mountain Layer for Depth -->
+  <path d="M 25 90 L 40 70 L 55 80 L 70 55 L 85 70 L 100 60 L 108 90 Z" 
+        fill="#3d6a45" opacity="0.7"/>
+  
+  <!-- Sun -->
+  <circle cx="90" cy="30" r="18" fill="url(#sunGradient)" opacity="0.9"/>
+  <circle cx="90" cy="30" r="15" fill="#FFD700" opacity="0.6"/>
+  
+  <!-- Trees/Silhouette -->
+  <path d="M 30 85 L 30 75 L 25 80 L 30 75 L 35 80 Z" fill="#1a3a25"/>
+  <path d="M 45 88 L 45 78 L 40 83 L 45 78 L 50 83 Z" fill="#1a3a25"/>
+  <path d="M 75 87 L 75 77 L 70 82 L 75 77 L 80 82 Z" fill="#1a3a25"/>
+  
+  <!-- Badge Border/Frame -->
+  <circle cx="64" cy="64" r="58" fill="none" stroke="#FFD700" stroke-width="2" opacity="0.6"/>
+  
+  <!-- Decorative Elements -->
+  <circle cx="64" cy="64" r="56" fill="none" stroke="#82AA52" stroke-width="1" opacity="0.4"/>
+  
+  <!-- Text/Title Area (optional, can be hidden if too small) -->
+  <!-- <text x="64" y="110" font-family="Arial, sans-serif" font-size="10" fill="#2d4a35" text-anchor="middle" font-weight="bold">SIERRA MADRE</text> -->
+</svg>
+
