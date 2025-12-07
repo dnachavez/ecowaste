@@ -126,7 +126,7 @@ export default function Achievements() {
 
             <main className={styles.mainContent}>
                 <div className={styles.achievementsHeader}>
-                    <h2>My Achievements</h2>
+                    <h2 style={{ color: '#2e8b57', marginBottom: '10px', fontSize: '18px', fontFamily: 'Montserrat, sans-serif', textTransform: 'uppercase', fontWeight: 700 }}>My Achievements</h2>
                     <p className={styles.subtitle}>Track your eco-friendly progress and accomplishments</p>
                 </div>
 

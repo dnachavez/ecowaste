@@ -255,7 +255,7 @@ export default function Browse() {
                 </div>
 
                 <div className={styles.sectionCard}>
-                    <h3>Available Donations</h3>
+                    <h3 style={{ color: '#2e8b57', marginBottom: '15px', fontSize: '18px', fontFamily: 'Montserrat, sans-serif', textTransform: 'uppercase', fontWeight: 700 }}>Available Donations</h3>
                     <div className="available">
                         {filteredDonations.length === 0 && <p>No donations found in this category.</p>}
                         {filteredDonations.map(donation => (

@@ -197,7 +197,7 @@ export default function Homepage() {
         {activeTab === 'donations' && (
           <div id="donations">
             <div className={styles.sectionCard} style={{background: 'none', boxShadow: 'none', padding: 0}}>
-              <h3 style={{ color: '#2e8b57', marginBottom: '15px', fontSize: '18px', fontFamily: 'Montserrat, sans-serif' }}>Available</h3>
+              <h3 style={{ color: '#2e8b57', marginBottom: '15px', fontSize: '18px', fontFamily: 'Montserrat, sans-serif', textTransform: 'uppercase', fontWeight: 700 }}>Available Donations</h3>
               <div id="availableDonationsContainer">
                 {donations.map(donation => (
                   <div key={donation.id} className={styles.donationPost}>

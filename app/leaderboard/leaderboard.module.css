@@ -1,0 +1,581 @@
+:root {
+    --primary-green: #82AA52;
+    --dark-green: #6d8f45;
+    --light-green: #F6FFEB;
+    --accent-green: #2e8b57;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 250px 1fr; /* Removed right sidebar column */
+    max-width: 1200px;
+    margin: 0 auto;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+/* Header Styles */
+.header {
+    grid-column: 1 / -1;
+    background-color: var(--primary-green);
+    color: white;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    min-height: 80px;
+    height: 90px;
+}
+
+.logoContainer {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    height: 100%;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 10px 0;
+}
+
+.logo img {
+    width: 70px;
+    height: 70px;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+}
+
+.logo img:hover {
+    transform: scale(1.05);
+}
+
+.userProfile {
+    display: flex;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+}
+
+.profilePic {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    overflow: hidden;
+    background-color: #3d6a06;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.profileName {
+    font-weight: 600;
+    margin-right: 5px;
+    font-size: 16px;
+}
+
+.profileDropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    width: 200px;
+    z-index: 100;
+    display: none;
+    overflow: hidden;
+}
+
+.userProfile:hover .profileDropdown {
+    display: block;
+}
+
+.dropdownItem {
+    padding: 10px 15px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.dropdownItem:hover {
+    background-color: #f5f5f5;
+}
+
+.dropdownDivider {
+    height: 1px;
+    background-color: #eee;
+    margin: 5px 0;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    background: linear-gradient(180deg, var(--light-green) 0%, #e8f5e8 100%);
+    padding: 30px 20px;
+    box-shadow: 5px 0 25px rgba(0,0,0,0.08);
+    position: sticky;
+    width: 250px;
+    top: 90px;
+    align-self: start;
+    height: calc(100vh - 90px);
+    overflow: hidden;
+    left: 0;
+    border: 1px solid rgba(130, 170, 82, 0.2);
+}
+
+.sidebar nav ul {
+    list-style: none;
+    padding: 0;
+}
+
+.sidebar nav li {
+    margin-bottom: 12px;
+}
+
+.sidebar nav a {
+    text-decoration: none;
+    color: #333;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 15px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    background: #f4fce8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar nav a.active,
+.sidebar nav a:hover {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 100%);
+    color: #F6FFEB;
+    transform: translateX(5px);
+    box-shadow: 0 5px 15px rgba(130, 170, 82, 0.3);
+}
+
+.sidebar nav a.active {
+    color: #faffe8;
+}
+
+/* Main Content */
+.mainContent {
+    min-height: calc(100vh - 90px);
+    overflow: visible;
+    padding: 20px;
+    background-color: #fff;
+    grid-column: 2 / 3;
+    width: 100%;
+}
+
+/* Leaderboard Specific Styles */
+.leaderboardContainer {
+    background-color: white;
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    width: 100%; /* Ensure full width */
+}
+
+.leaderboardTitle {
+    font-family: 'Montserrat', sans-serif;
+    color: #2e8b57;
+    margin-bottom: 10px;
+    font-size: 18px;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.leaderboardSubtitle {
+    color: #666;
+    margin-bottom: 30px;
+}
+
+/* Enhanced Leaderboard Styles */
+
+.leaderboardTable {
+    width: 100%;
+    border-collapse: separate; /* Changed from collapse for spacing/border radius */
+    border-spacing: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.leaderboardTable th {
+    background-color: #82AA52; /* Added background */
+    color: white;
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 700;
+}
+
+.leaderboardTable td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #e0e0e0;
+    vertical-align: middle;
+}
+
+.leaderboardTable tr {
+    transition: all 0.3s ease;
+}
+
+/* Zebra striping for non-top-3 rows (if needed, or just general) */
+.leaderboardTable tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.leaderboardTable tr:hover {
+    background-color: #f0f7e8;
+}
+
+/* Top Rank Special Styles */
+.rankFirst {
+    background: linear-gradient(135deg, #fff9e6 0%, #fff0c2 100%) !important;
+    border-left: 4px solid #FFD700;
+}
+
+.rankSecond {
+    background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%) !important;
+    border-left: 4px solid #C0C0C0;
+}
+
+.rankThird {
+    background: linear-gradient(135deg, #f7e8d1 0%, #f0d9b5 100%) !important;
+    border-left: 4px solid #CD7F32;
+}
+
+/* Hover effects for regular rows */
+.leaderboardTable tr:not(.rankFirst):not(.rankSecond):not(.rankThird):hover {
+    background-color: #f0f7e8;
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+}
+
+.rankBadge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    position: relative;
+    font-weight: bold;
+    color: white;
+}
+
+.rank1 {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    box-shadow: 0 2px 5px rgba(255, 215, 0, 0.3);
+}
+
+.rank2 {
+    background: linear-gradient(135deg, #C0C0C0 0%, #A0A0A0 100%);
+    box-shadow: 0 2px 5px rgba(192, 192, 192, 0.3);
+}
+
+.rank3 {
+    background: linear-gradient(135deg, #CD7F32 0%, #A66A28 100%);
+    box-shadow: 0 2px 5px rgba(205, 127, 50, 0.3);
+}
+
+.rankNumber {
+    font-weight: bold;
+    font-size: 18px;
+    color: #555;
+    width: 36px;
+    text-align: center;
+    display: inline-block;
+}
+
+.userLinkWrapper {
+    width: 100%;
+}
+
+.userLink {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: #333;
+    transition: all 0.2s ease-in-out;
+    padding: 8px 12px;
+    border-radius: 8px;
+    width: 100%;
+}
+
+.userLink:hover {
+    background-color: rgba(130, 170, 82, 0.1);
+    transform: translateX(5px);
+}
+
+.userLink:hover .profileName {
+    color: #2e8b57;
+}
+
+.userLink:hover .tableProfilePic {
+    transform: scale(1.1);
+    box-shadow: 0 0 8px rgba(130, 170, 82, 0.4);
+}
+
+.tableProfilePic {
+    width: 42px; /* Slightly adjusted */
+    height: 42px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: #f2f8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 2px solid #d6e8d0;
+    transition: all 0.2s ease;
+    margin-right: 15px;
+    font-weight: bold;
+    font-size: 18px;
+    color: #82AA52; /* Icon color */
+}
+
+/* If the profile pic has an image, reset color */
+.tableProfilePic img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.pointsContainer {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pointsValue {
+    font-weight: 700;
+    font-size: 18px;
+    color: #2e8b57;
+}
+
+.pointsLabel {
+    font-size: 12px;
+    color: #777;
+    font-weight: normal;
+}
+
+@media (max-width: 768px) {
+    .header {
+        min-height: 70px;
+        height: 70px;
+        padding: 0 15px;
+    }
+    
+    .logo img {
+        width: 55px;
+        height: 55px;
+    }
+    
+    .profilePic {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .sidebar {
+        display: none;
+    }
+    
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .mainContent {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Feedback Button Styles */
+.feedbackBtn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background-color: #82AA52;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+.feedbackBtn:hover {
+    transform: scale(1.1);
+    background-color: #6d8f45;
+}
+
+/* Feedback Modal Styles */
+.feedbackModal {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 2000;
+    justify-content: center;
+    align-items: center;
+}
+
+.feedbackContent {
+    background-color: white;
+    padding: 30px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 2001;
+}
+
+.feedbackCloseBtn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #777;
+}
+
+.feedbackCloseBtn:hover {
+    color: #333;
+}
+
+.feedbackForm h3 {
+    color: #82AA52;
+    margin-bottom: 20px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.feedbackForm textarea {
+    width: 100%;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 150px;
+    margin-bottom: 20px;
+    font-family: 'Open Sans', sans-serif;
+}
+
+.feedbackSubmitBtn {
+    background-color: #82AA52;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.3s;
+    width: 100%;
+}
+
+.feedbackSubmitBtn:hover {
+    background-color: #6d8f45;
+}
+
+/* Emoji rating */
+.emojiRating {
+    display: flex;
+    justify-content: space-between;
+    margin: 20px 0;
+}
+
+.emojiOption {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+    padding: 5px;
+    border-radius: 50%;
+}
+
+.emojiOption:hover {
+    transform: scale(1.2);
+    background-color: #f0f7e8;
+}
+
+.emojiOption.selected {
+    transform: scale(1.3);
+    background-color: #e0f0d8;
+}
+
+.emoji {
+    font-size: 30px;
+    margin-bottom: 5px;
+}
+
+.emojiLabel {
+    font-size: 12px;
+    color: #666;
+}
+
+.feedbackDetail {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+/* Thank you message */
+.thankYouMessage {
+    text-align: center;
+    padding: 20px;
+}
+
+.thankYouMessage h3 {
+    color: #82AA52;
+    margin-bottom: 15px;
+}
+
+.thankYouEmoji {
+    font-size: 50px;
+    margin-bottom: 20px;
+}
+
+/* Error message */
+.errorMessage {
+    color: #e74c3c;     
+    font-size: 13px;
+    margin-top: 5px;
+    display: none;
+}
+
+/* Loading spinner */
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+    margin-left: 10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
