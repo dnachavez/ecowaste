@@ -1,12 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './profile.module.css';
+import { db, auth } from '../../lib/firebase';
+import { ref, onValue, update } from 'firebase/database';
+import { updateProfile } from 'firebase/auth';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -26,25 +29,53 @@ export default function ProfilePage() {
 
   // Edit profile form state
   const [profileForm, setProfileForm] = useState({
-    firstName: 'Dan Glyde',
-    lastName: 'Chavez',
-    middleName: 'Funtilar',
-    email: 'superdanglyde.yt@gmail.com',
-    phone: '09942816658',
-    address: 'Downsview, Nivel Hills, Lahug',
-    city: 'Cebu City',
-    zipCode: '6000'
+    firstName: '',
+    lastName: '',
+    middleName: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    zipCode: ''
   });
 
-  const openEditModal = () => {
+  useEffect(() => {
     if (user) {
-      setProfileForm(prev => ({
-        ...prev,
-        email: user.email || prev.email,
-        firstName: user.displayName ? user.displayName.split(' ')[0] : prev.firstName,
-        lastName: user.displayName && user.displayName.split(' ').length > 1 ? user.displayName.split(' ').slice(1).join(' ') : prev.lastName,
-      }));
+        const userRef = ref(db, 'users/' + user.uid);
+        onValue(userRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                setProfileForm(prev => ({
+                    ...prev,
+                    firstName: data.firstName || '',
+                    lastName: data.lastName || '',
+                    middleName: data.middleName || '',
+                    email: user.email || prev.email,
+                    phone: data.contactNumber || data.phone || '',
+                    address: data.address || '',
+                    city: data.city || '',
+                    zipCode: data.zipCode || ''
+                }));
+            } else {
+                 // Initialize from Auth if no DB data
+                 const names = user.displayName ? user.displayName.split(' ') : [];
+                 setProfileForm(prev => ({
+                    ...prev,
+                    email: user.email || '',
+                    firstName: names[0] || '',
+                    lastName: names.length > 1 ? names.slice(1).join(' ') : ''
+                 }));
+            }
+        });
     }
+  }, [user]);
+
+  // Format member since date
+  const memberSinceDate = user?.metadata?.creationTime 
+    ? new Date(user.metadata.creationTime).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : 'December 2025';
+
+  const openEditModal = () => {
     setShowEditProfileModal(true);
   };
 
@@ -56,11 +87,39 @@ export default function ProfilePage() {
     }));
   };
 
-  const handleProfileSubmit = (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate update
-    console.log('Updating profile:', profileForm);
-    setShowEditProfileModal(false);
+    if (!user) return;
+
+    try {
+        // Update Firebase Auth Profile (Display Name)
+        const fullName = `${profileForm.firstName} ${profileForm.middleName ? profileForm.middleName + ' ' : ''}${profileForm.lastName}`.trim();
+        if (user.displayName !== fullName) {
+            await updateProfile(user, {
+                displayName: fullName
+            });
+        }
+
+        // Update Realtime Database
+        const userRef = ref(db, 'users/' + user.uid);
+        await update(userRef, {
+            firstName: profileForm.firstName,
+            lastName: profileForm.lastName,
+            middleName: profileForm.middleName,
+            fullName: fullName,
+            contactNumber: profileForm.phone,
+            address: profileForm.address,
+            city: profileForm.city,
+            zipCode: profileForm.zipCode,
+            email: profileForm.email
+        });
+
+        setShowEditProfileModal(false);
+        alert("Profile updated successfully!");
+    } catch (error) {
+        console.error("Error updating profile: ", error);
+        alert("Failed to update profile. Please try again.");
+    }
   };
 
   const handleFeedbackSubmit = (e: React.FormEvent) => {
@@ -127,8 +186,8 @@ export default function ProfilePage() {
               {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'D'}
             </div>
             <div className={styles.profileInfo}>
-              <h2>{user?.displayName || 'Dan Glyde Funtilar Chavez'}</h2>
-              <p>Member since December 2025</p>
+              <h2>{user?.displayName || 'Guest User'}</h2>
+              <p>Member since {memberSinceDate}</p>
               <p><i className="fas fa-map-marker-alt"></i> {profileForm.city}</p>
               <span className={styles.profileLevel}>Level 1 Eco Warrior</span>
             </div>
