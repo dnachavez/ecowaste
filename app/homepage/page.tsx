@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
@@ -9,6 +10,8 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './homepage.module.css';
 import { db } from '../../lib/firebase';
 import { ref, push, onValue } from 'firebase/database';
+
+import RecycledIdeaPopup, { RecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
 
 interface Comment {
   id: string;
@@ -44,16 +47,6 @@ interface FirebaseDonation {
   comments?: Record<string, Omit<Comment, 'id'>>;
 }
 
-interface RecycledIdea {
-  id: string;
-  title: string;
-  author: string;
-  timeAgo: string;
-  image: string;
-  description: string;
-  commentsCount: number;
-}
-
 interface FirebaseProject {
   id: string;
   title: string;
@@ -63,11 +56,14 @@ interface FirebaseProject {
   final_images?: string[];
   visibility?: 'private' | 'public';
   status?: string;
-  // ... other fields
+  materials?: ProjectMaterial[];
+  workflow_stage?: number;
+  steps?: Step[];
 }
 
 export default function Homepage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('donations');
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
@@ -78,6 +74,8 @@ export default function Homepage() {
   const [showRequestPopup, setShowRequestPopup] = useState(false);
   const [showRequestSuccessPopup, setShowRequestSuccessPopup] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null);
+  const [showIdeaPopup, setShowIdeaPopup] = useState(false);
+  const [selectedIdea, setSelectedIdea] = useState<RecycledIdea | null>(null);
 
   const [recycledIdeas, setRecycledIdeas] = useState<RecycledIdea[]>([]);
 
@@ -172,6 +170,21 @@ export default function Homepage() {
     return () => unsubscribe();
   }, []);
 
+  const handleTryIdeaClick = (idea: RecycledIdea) => {
+    setSelectedIdea(idea);
+    setShowIdeaPopup(true);
+  };
+
+  const handleCloseIdeaPopup = () => {
+    setShowIdeaPopup(false);
+    setSelectedIdea(null);
+  };
+
+  const handleConfirmIdea = () => {
+    handleCloseIdeaPopup();
+    router.push('/start-project');
+  };
+
 
   const handleDonateClick = () => {
     setShowDonationPopup(true);
@@ -222,14 +235,19 @@ export default function Homepage() {
     try {
         const requestData = {
             donationId: selectedDonation.id,
+            donationTitle: selectedDonation.description ? (selectedDonation.description.substring(0, 50) + (selectedDonation.description.length > 50 ? '...' : '')) : 'Donation',
+            donationCategory: selectedDonation.category,
+            donationImage: selectedDonation.images && selectedDonation.images.length > 0 ? selectedDonation.images[0] : '',
             requesterId: user.uid,
             requesterName: user.displayName || 'Anonymous',
             requesterAvatar: user.photoURL || 'U',
-            quantityClaimed: requestFormData.quantityClaim,
+            ownerId: selectedDonation.user.id,
+            quantity: requestFormData.quantityClaim, // Using 'quantity' to match other pages
+            quantityClaimed: requestFormData.quantityClaim, // Keeping for backward compat if needed
             projectId: requestFormData.projectId,
             urgencyLevel: requestFormData.urgencyLevel,
             status: 'pending',
-            createdAt: new Date().toISOString()
+            createdAt: Date.now() // Changed to Date.now() to match other pages which might use timestamp number
         };
 
         const requestsRef = ref(db, 'requests');
@@ -390,7 +408,10 @@ export default function Homepage() {
                 timeAgo: project.createdAt, // We might want to calculate real time ago if createdAt is ISO string
                 image: project.final_images ? project.final_images[0] : '',
                 description: project.description,
-                commentsCount: 0 // Placeholder
+                commentsCount: 0, // Placeholder
+                materials: project.materials ? (Array.isArray(project.materials) ? project.materials : Object.values(project.materials)) as ProjectMaterial[] : [],
+                workflow_stage: project.workflow_stage,
+                steps: project.steps ? (Array.isArray(project.steps) ? project.steps : Object.values(project.steps)) as Step[] : []
             }));
         
         setRecycledIdeas(loadedProjects);
@@ -580,7 +601,7 @@ export default function Homepage() {
                         {idea.description}
                     </p>
                     <div className={styles.ideaActions}>
-                        <button className={styles.actionBtn}>Try This Idea</button>
+                        <button className={styles.actionBtn} onClick={() => handleTryIdeaClick(idea)}>Try This Idea</button>
                         <span className={styles.comments}>{idea.commentsCount} Comments</span>
                     </div>
                  </div>
@@ -824,6 +845,14 @@ export default function Homepage() {
           <button className={styles.continueBtn} onClick={handleClosePopup}>Continue</button>
         </div>
       </div>
+    )}
+    
+    {showIdeaPopup && selectedIdea && (
+      <RecycledIdeaPopup 
+        idea={selectedIdea} 
+        onClose={handleCloseIdeaPopup} 
+        onConfirm={handleConfirmIdea} 
+      />
     )}
     </ProtectedRoute>
   );

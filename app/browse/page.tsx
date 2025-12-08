@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
@@ -10,6 +10,7 @@ import styles from './browse.module.css';
 import { db } from '../../lib/firebase';
 import { ref, onValue, push, set } from 'firebase/database';
 import { useAuth } from '../../context/AuthContext';
+import RecycledIdeaPopup, { RecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
 
 interface Comment {
   id: string;
@@ -45,16 +46,6 @@ interface FirebaseDonation {
   comments?: Record<string, Omit<Comment, 'id'>>;
 }
 
-interface RecycledIdea {
-  id: string;
-  title: string;
-  author: string;
-  timeAgo: string;
-  image: string;
-  description: string;
-  commentsCount: number;
-}
-
 interface FirebaseProject {
   id: string;
   title: string;
@@ -64,12 +55,15 @@ interface FirebaseProject {
   final_images?: string[];
   visibility?: 'private' | 'public';
   status?: string;
-  // ... other fields
+  materials?: ProjectMaterial[];
+  workflow_stage?: number;
+  steps?: Step[];
 }
 
 function BrowseContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const categoryParam = searchParams.get('category');
   const searchParam = searchParams.get('search');
   
@@ -81,9 +75,12 @@ function BrowseContent() {
   const [showRequestPopup, setShowRequestPopup] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null);
   const [requestQuantity, setRequestQuantity] = useState(1);
+  const [urgencyLevel, setUrgencyLevel] = useState('High');
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [allDonations, setAllDonations] = useState<Donation[]>([]);
   const [recycledIdeas, setRecycledIdeas] = useState<RecycledIdea[]>([]);
+  const [showIdeaPopup, setShowIdeaPopup] = useState(false);
+  const [selectedIdea, setSelectedIdea] = useState<RecycledIdea | null>(null);
 
   const calculateTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -145,6 +142,21 @@ function BrowseContent() {
     return () => unsubscribe();
   }, []);
 
+  const handleTryIdeaClick = (idea: RecycledIdea) => {
+    setSelectedIdea(idea);
+    setShowIdeaPopup(true);
+  };
+
+  const handleCloseIdeaPopup = () => {
+    setShowIdeaPopup(false);
+    setSelectedIdea(null);
+  };
+
+  const handleConfirmIdea = () => {
+    handleCloseIdeaPopup();
+    router.push('/start-project');
+  };
+
   useEffect(() => {
     if (categoryParam && categoryParam !== activeCategory) {
         setActiveCategory(categoryParam);
@@ -200,6 +212,7 @@ function BrowseContent() {
   const openRequestModal = (donation: Donation) => {
       setSelectedDonation(donation);
       setRequestQuantity(1);
+      setUrgencyLevel('High');
       setShowRequestPopup(true);
   };
 
@@ -228,6 +241,7 @@ function BrowseContent() {
           ownerId: selectedDonation.user.id,
           status: 'pending',
           quantity: requestQuantity,
+          urgencyLevel: urgencyLevel,
           createdAt: Date.now()
       };
 
@@ -279,7 +293,10 @@ function BrowseContent() {
                 timeAgo: project.createdAt,
                 image: project.final_images ? project.final_images[0] : '',
                 description: project.description,
-                commentsCount: 0 // Placeholder
+                commentsCount: 0, // Placeholder
+                materials: project.materials ? (Array.isArray(project.materials) ? project.materials : Object.values(project.materials)) as ProjectMaterial[] : [],
+                workflow_stage: project.workflow_stage,
+                steps: project.steps ? (Array.isArray(project.steps) ? project.steps : Object.values(project.steps)) as Step[] : []
             }));
         
         setRecycledIdeas(loadedProjects);
@@ -473,7 +490,7 @@ function BrowseContent() {
                             {idea.description}
                         </p>
                         <div className={styles.ideaActions}>
-                            <button className={styles.actionBtn}>Try This Idea</button>
+                            <button className={styles.actionBtn} onClick={() => handleTryIdeaClick(idea)}>Try This Idea</button>
                             <span className={styles.comments}>{idea.commentsCount} Comments</span>
                         </div>
                     </div>
@@ -520,7 +537,11 @@ function BrowseContent() {
                     </div>
                     <div style={{marginBottom: '15px'}}>
                         <label style={{display: 'block', marginBottom: '5px', fontWeight: 'bold'}}>Urgency Level:</label>
-                        <select style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc'}}>
+                        <select 
+                            value={urgencyLevel}
+                            onChange={(e) => setUrgencyLevel(e.target.value)}
+                            style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc'}}
+                        >
                             <option value="High">High (Immediate Need)</option>
                             <option value="Medium">Medium (Within 2 weeks)</option>
                             <option value="Low">Low (Planning ahead)</option>
@@ -559,6 +580,13 @@ function BrowseContent() {
         </div>
       )}
     </div>
+      {showIdeaPopup && selectedIdea && (
+        <RecycledIdeaPopup 
+          idea={selectedIdea} 
+          onClose={handleCloseIdeaPopup} 
+          onConfirm={handleConfirmIdea} 
+        />
+      )}
     </ProtectedRoute>
   );
 }

@@ -1,0 +1,186 @@
+.popupContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.popupContent {
+  background-color: white;
+  border-radius: 12px;
+  padding: 30px;
+  width: 90%;
+  max-width: 500px;
+  height: 70vh; /* Fixed height */
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.closeBtn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  font-size: 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  z-index: 10;
+}
+
+.title {
+  color: #2e8b57;
+  margin-bottom: 15px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.popupScrollArea {
+  overflow-y: auto;
+  padding-right: 10px;
+  flex: 1; /* Take remaining space */
+  margin-top: 10px;
+}
+
+.imageContainer {
+  width: 100%;
+  height: 200px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sectionTitle {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.description {
+  color: #666;
+  line-height: 1.6;
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.toggleSection {
+  margin-bottom: 15px;
+  background-color: #e8f5e9; /* Light green background */
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.toggleHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #2e8b57;
+  user-select: none;
+}
+
+.toggleHeader:hover {
+  background-color: #dcedc8;
+}
+
+.toggleContent {
+  padding: 15px;
+  border-top: 1px solid #dcedc8;
+  background-color: white;
+}
+
+.materialsList {
+  padding-left: 20px;
+  color: #666;
+  margin: 0;
+}
+
+.materialItem {
+  margin-bottom: 5px;
+}
+
+.stepItem {
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.stepItem:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.stepTitle {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 5px;
+  display: block;
+}
+
+.stepDescription {
+  color: #666;
+  font-size: 14px;
+}
+
+.submitBtnContainer {
+  margin-top: 20px;
+  text-align: center;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+
+.submitBtn {
+  width: 100%;
+  max-width: 250px;
+  padding: 12px;
+  background-color: #2e8b57;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.submitBtn:hover {
+  background-color: #246d44;
+}
+
+/* Scrollbar styling */
+.popupScrollArea::-webkit-scrollbar {
+  width: 8px;
+}
+
+.popupScrollArea::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.popupScrollArea::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+.popupScrollArea::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}

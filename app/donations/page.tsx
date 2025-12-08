@@ -6,7 +6,7 @@ import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './donations.module.css';
 import { db } from '../../lib/firebase';
-import { ref, query, orderByChild, equalTo, onValue, update } from 'firebase/database';
+import { ref, query, orderByChild, equalTo, onValue, update, remove } from 'firebase/database';
 import { useAuth } from '../../context/AuthContext';
 
 interface Donation {
@@ -35,6 +35,8 @@ interface Request {
   ownerId: string;
   status: 'pending' | 'approved' | 'rejected' | 'completed';
   quantity: number;
+  urgencyLevel?: string;
+  projectId?: string;
   createdAt: number;
 }
 
@@ -116,6 +118,14 @@ export default function DonationsPage() {
     const requestRef = ref(db, `requests/${requestId}`);
     update(requestRef, { status: newStatus })
       .catch((error) => console.error("Error updating status:", error));
+  };
+
+  const handleDeleteRequest = (requestId: string) => {
+    if (confirm("Are you sure you want to delete this request?")) {
+        const requestRef = ref(db, `requests/${requestId}`);
+        remove(requestRef)
+            .catch((error) => console.error("Error deleting request:", error));
+    }
   };
 
   const receivedDonations = myRequests.filter(req => req.status === 'approved' || req.status === 'completed');
@@ -236,28 +246,43 @@ export default function DonationsPage() {
                                                     <i className="fas fa-cube"></i>
                                                     <span>Qty: {request.quantity}</span>
                                                 </div>
+                                                {request.urgencyLevel && (
+                                                    <div className={styles['meta-item']}>
+                                                        <i className="fas fa-exclamation-circle"></i>
+                                                        <span>Urgency: {request.urgencyLevel}</span>
+                                                    </div>
+                                                )}
                                                 <div className={styles['meta-item']}>
                                                     <i className="far fa-calendar-alt"></i>
                                                     <span>{new Date(request.createdAt).toLocaleDateString()}</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        {request.status === 'pending' && (
-                                            <div className={styles['row-actions']}>
-                                                <button 
-                                                    className={styles['btn-approve']}
-                                                    onClick={() => handleUpdateStatus(request.id, 'approved')}
-                                                >
-                                                    Approve
-                                                </button>
-                                                <button 
-                                                    className={styles['btn-reject']}
-                                                    onClick={() => handleUpdateStatus(request.id, 'rejected')}
-                                                >
-                                                    Reject
-                                                </button>
-                                            </div>
-                                        )}
+                                        <div className={styles['row-actions']}>
+                                            {request.status === 'pending' && (
+                                                <>
+                                                    <button 
+                                                        className={styles['btn-approve']}
+                                                        onClick={() => handleUpdateStatus(request.id, 'approved')}
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                    <button 
+                                                        className={styles['btn-reject']}
+                                                        onClick={() => handleUpdateStatus(request.id, 'rejected')}
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </>
+                                            )}
+                                            <button 
+                                                className={styles['btn-reject']} // Reusing reject style (usually red) or maybe create a delete style
+                                                style={{backgroundColor: '#d32f2f', marginLeft: '5px'}}
+                                                onClick={() => handleDeleteRequest(request.id)}
+                                            >
+                                                <i className="fas fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
