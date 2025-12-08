@@ -3,6 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { ref, onValue, update, remove } from 'firebase/database';
+// import { ref as storageRef, uploadBytes } from 'firebase/storage';
+import { db } from '../../../lib/firebase';
 import Header from '../../../components/Header';
 import Sidebar from '../../../components/Sidebar';
 import ProtectedRoute from '../../../components/ProtectedRoute';
@@ -39,36 +42,8 @@ interface Project {
   workflow_stage: 1 | 2 | 3; // 1: Preparation, 2: Construction, 3: Share
 }
 
-// Mock Data
-const MOCK_PROJECT: Project = {
-  id: '25',
-  title: 'Plastic Bottle Vase',
-  description: 'Vase made out of plastic bottles',
-  created_at: 'Dec 07, 2025',
-  status: 'in-progress',
-  workflow_stage: 1,
-  materials: [
-    { 
-      id: '96', 
-      name: 'plastic bottles', 
-      unit: 'pcs', 
-      needed: 1, 
-      acquired: 1, 
-      is_found: true,
-      is_completed: true 
-    }
-  ],
-  steps: [
-    {
-      id: '6',
-      step_number: 1,
-      title: 'Step 1',
-      description: 'In a large bowl, add the all purpose flour, powdered milk and baking powder. Combine and mix well.',
-      is_completed: true,
-      images: []
-    }
-  ]
-};
+// Mock Data removed
+
 
 export default function ProjectDetailsPage() {
   const router = useRouter();
@@ -82,14 +57,50 @@ export default function ProjectDetailsPage() {
   const [showChecklistModal, setShowChecklistModal] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
 
+  // Edit Project State
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+
+  const [checklistQuantity, setChecklistQuantity] = useState<string>('');
+  const [checklistError, setChecklistError] = useState<string>('');
+  const [checklistFile, setChecklistFile] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
   useEffect(() => {
-    // In a real app, fetch project by ID
-    // For now, use mock data if ID matches or just load it
-    if (params.id && !project) {
-      // Defer state update to next tick to avoid cascading renders
-      queueMicrotask(() => setProject(MOCK_PROJECT));
+    if (params.id) {
+      const projectRef = ref(db, `projects/${params.id}`);
+      const unsubscribe = onValue(projectRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          // Transform materials object to array if needed
+          const materialsList = data.materials ? Object.entries(data.materials).map(([key, value]) => {
+            const mat = value as { needed?: number; quantity?: string; unit?: string; [key: string]: unknown };
+            return {
+              ...mat,
+              id: key, // Use Firebase key as the ID to ensure uniqueness and correct update path
+              needed: mat.needed !== undefined ? mat.needed : (parseInt(mat.quantity || '0') || 0),
+              unit: mat.unit || 'units'
+            };
+          }) : [];
+          
+          const stepsList = data.steps ? Object.entries(data.steps as Record<string, Omit<Step, 'id'>>).map(([key, value]) => ({
+            id: key,
+            ...value
+          })) : [];
+
+          setProject({
+            ...data,
+            id: params.id as string,
+            materials: materialsList,
+            steps: stepsList
+          });
+        }
+      });
+      return () => unsubscribe();
     }
-  }, [params.id, project]);
+  }, [params.id]);
 
   if (!project) {
     return <div>Loading...</div>;
@@ -107,6 +118,134 @@ export default function ProjectDetailsPage() {
     return 0;
   };
 
+  const isAllMaterialsCompleted = project?.materials.length > 0 && project?.materials.every(m => m.is_completed);
+
+  const handleProceed = async () => {
+    if (!project || !isAllMaterialsCompleted) return;
+
+    try {
+      const projectRef = ref(db, `projects/${project.id}`);
+      await update(projectRef, {
+        workflow_stage: 2
+      });
+      setActiveTab('construction');
+    } catch (error) {
+      console.error('Error proceeding to next stage:', error);
+    }
+  };
+
+  const handleChecklistClick = (material: Material) => {
+    setSelectedMaterial(material);
+    setChecklistQuantity('');
+    setChecklistError('');
+    setChecklistFile(null);
+    setShowChecklistModal(true);
+  };
+
+  const processFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setChecklistFile(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      processFile(e.target.files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleChecklistSubmit = async () => {
+    if (!selectedMaterial || !project) return;
+
+    const qty = parseInt(checklistQuantity);
+    if (isNaN(qty) || qty < selectedMaterial.needed) {
+      setChecklistError(`Quantity must be at least ${selectedMaterial.needed} ${selectedMaterial.unit}`);
+      return;
+    }
+
+    if (!checklistFile) {
+      setChecklistError('Proof of material is required');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Update material in DB
+      const materialRef = ref(db, `projects/${project.id}/materials/${selectedMaterial.id}`);
+      await update(materialRef, {
+        acquired: qty,
+        is_completed: true,
+        evidence_image: checklistFile 
+      });
+
+      setShowChecklistModal(false);
+    } catch (error) {
+      console.error('Error updating material:', error);
+      setChecklistError('Failed to update material. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteMaterial = async (materialId: string) => {
+    if (!project || project.materials.length <= 1) return;
+    
+    if (window.confirm('Are you sure you want to delete this material?')) {
+      try {
+        const materialRef = ref(db, `projects/${project.id}/materials/${materialId}`);
+        await remove(materialRef);
+      } catch (error) {
+        console.error('Error deleting material:', error);
+      }
+    }
+  };
+
+  const handleEditProjectClick = () => {
+    if (project) {
+      setEditTitle(project.title);
+      setEditDescription(project.description);
+      setShowEditProjectModal(true);
+    }
+  };
+
+  const handleUpdateProject = async () => {
+    if (!project || !editTitle.trim() || !editDescription.trim()) return;
+
+    try {
+      const projectRef = ref(db, `projects/${project.id}`);
+      await update(projectRef, {
+        title: editTitle,
+        description: editDescription
+      });
+      setShowEditProjectModal(false);
+    } catch (error) {
+      console.error('Error updating project:', error);
+      alert('Failed to update project. Please try again.');
+    }
+  };
+
+
   return (
     <ProtectedRoute>
       <div className={styles.container}>
@@ -122,7 +261,7 @@ export default function ProjectDetailsPage() {
           {/* Project Header */}
           <section className={styles['project-header']}>
             <div className={styles['project-actions']}>
-              <button className={styles['edit-btn']}>
+              <button className={styles['edit-btn']} onClick={handleEditProjectClick}>
                 <i className="fas fa-edit"></i> Edit Project
               </button>
             </div>
@@ -225,7 +364,7 @@ export default function ProjectDetailsPage() {
                               <div className={styles['material-name']}>{material.name}</div>
                               <div className={styles['material-quantity']}>
                                 <span className={`${styles['quantity-display']} ${material.is_completed ? styles.completed : ''}`}>
-                                  {material.acquired}/{material.needed}
+                                  {material.acquired || 0}/{material.needed}
                                 </span> units needed
                                 {material.is_completed && (
                                   <span className={styles['material-complete-badge']}>
@@ -235,10 +374,26 @@ export default function ProjectDetailsPage() {
                               </div>
                             </div>
                             <div className={styles['material-actions']}>
-                              <button className={`${styles['btn']} ${styles['checklist-btn']} ${material.is_completed ? styles.completed : ''}`}>
+                              <button 
+                                className={`${styles['btn']} ${styles['checklist-btn']} ${material.is_completed ? styles.completed : ''}`}
+                                onClick={() => handleChecklistClick(material)}
+                              >
                                 <i className="fas fa-check-circle"></i> Checklist
                               </button>
-                              <button className={`${styles['btn']} ${styles['small']} ${styles['danger']}`}>
+                              <Link 
+                                href={`/browse?search=${encodeURIComponent(material.name)}`}
+                                className={`${styles['btn']} ${styles['small']} ${styles['primary']}`}
+                                title="Find Donation"
+                                style={{ marginRight: '5px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <i className="fas fa-search"></i>
+                              </Link>
+                              <button 
+                                className={`${styles['btn']} ${styles['small']} ${styles['danger']}`}
+                                onClick={() => handleDeleteMaterial(material.id)}
+                                disabled={project.materials.length <= 1}
+                                style={{ opacity: project.materials.length <= 1 ? 0.5 : 1, cursor: project.materials.length <= 1 ? 'not-allowed' : 'pointer' }}
+                              >
                                 <i className="fas fa-trash"></i>
                               </button>
                             </div>
@@ -249,6 +404,18 @@ export default function ProjectDetailsPage() {
                       <div className={styles['stage-actions']}>
                         <button className={`${styles['btn']} ${styles['primary']}`} onClick={() => setShowAddMaterialModal(true)}>
                           <i className="fas fa-plus"></i> Add Material
+                        </button>
+                        <button 
+                          className={`${styles['btn']} ${isAllMaterialsCompleted ? styles['primary'] : styles['secondary']}`} 
+                          onClick={handleProceed}
+                          disabled={!isAllMaterialsCompleted} 
+                          style={{ 
+                            opacity: isAllMaterialsCompleted ? 1 : 0.5, 
+                            cursor: isAllMaterialsCompleted ? 'pointer' : 'not-allowed', 
+                            marginLeft: '10px' 
+                          }}
+                        >
+                          Proceed
                         </button>
                       </div>
                     </div>
@@ -438,6 +605,125 @@ export default function ProjectDetailsPage() {
               <div className={styles['modal-actions']}>
                 <button className={styles['action-btn']} onClick={() => setShowAddStepModal(false)}>Cancel</button>
                 <button className={`${styles['action-btn']} ${styles['check-btn']}`}>Add Step</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Checklist Modal */}
+        {showChecklistModal && selectedMaterial && (
+          <div className={`${styles.modal} ${styles.active}`}>
+            <div className={styles['modal-content']}>
+              <div className={styles['modal-header']}>
+                <h3 className={styles['modal-title']}>Checklist: {selectedMaterial.name}</h3>
+                <button className={styles['close-modal']} onClick={() => setShowChecklistModal(false)}>×</button>
+              </div>
+              <div className={styles['modal-body']}>
+                <div className={styles['form-group']}>
+                  <label>Quantity Acquired ({selectedMaterial.unit}) *</label>
+                  <input 
+                    type="number" 
+                    value={checklistQuantity}
+                    onChange={(e) => setChecklistQuantity(e.target.value)}
+                    placeholder={`Required: ${selectedMaterial.needed}`}
+                  />
+                </div>
+                
+                {parseInt(checklistQuantity) >= selectedMaterial.needed && (
+                     <div className={styles['form-group']}>
+                       <label>Evidence Photo *</label>
+                       <div 
+                          className={styles['file-drop-area']}
+                          style={{ 
+                            border: `2px dashed ${isDragging ? '#2e8b57' : '#ccc'}`, 
+                            padding: '20px', 
+                            textAlign: 'center', 
+                            cursor: 'pointer',
+                            backgroundColor: isDragging ? '#f0fff4' : 'transparent'
+                          }}
+                          onClick={() => document.getElementById('checklist-file')?.click()}
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
+                        >
+                          <input 
+                            type="file" 
+                            id="checklist-file" 
+                            style={{ display: 'none' }} 
+                            accept="image/*"
+                            onChange={handleFileChange}
+                          />
+                          {checklistFile ? (
+                            <div style={{ position: 'relative', width: '100%', height: '150px' }}>
+                              <img 
+                                src={checklistFile} 
+                                alt="Evidence" 
+                                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <i className="fas fa-cloud-upload-alt" style={{ fontSize: '24px', marginBottom: '10px' }}></i>
+                              <p>Drag & Drop or Click to Upload</p>
+                            </>
+                          )}
+                        </div>
+                     </div>
+                )}
+
+                {checklistError && <div style={{ color: 'red', marginTop: '10px' }}>{checklistError}</div>}
+              </div>
+              <div className={styles['modal-actions']}>
+                <button className={styles['action-btn']} onClick={() => setShowChecklistModal(false)}>Cancel</button>
+                <button 
+                    className={`${styles['action-btn']} ${styles['check-btn']}`} 
+                    onClick={handleChecklistSubmit}
+                    disabled={isUploading}
+                >
+                    {isUploading ? 'Updating...' : 'Complete Item'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Project Modal */}
+        {showEditProjectModal && (
+          <div className={`${styles.modal} ${styles.active}`}>
+            <div className={styles['modal-content']}>
+              <div className={styles['modal-header']}>
+                <h3 className={styles['modal-title']}>Edit Project Details</h3>
+                <button className={styles['close-modal']} onClick={() => setShowEditProjectModal(false)}>×</button>
+              </div>
+              <div className={styles['modal-body']}>
+                <div className={styles['form-group']}>
+                  <label>Project Title *</label>
+                  <input 
+                    type="text" 
+                    value={editTitle} 
+                    onChange={(e) => setEditTitle(e.target.value)} 
+                    placeholder="Enter project title" 
+                  />
+                </div>
+                <div className={styles['form-group']}>
+                  <label>Description *</label>
+                  <textarea 
+                    value={editDescription} 
+                    onChange={(e) => setEditDescription(e.target.value)} 
+                    placeholder="Describe your project..."
+                    style={{ minHeight: '100px' }}
+                  ></textarea>
+                </div>
+              </div>
+              <div className={styles['modal-actions']}>
+                <button className={styles['action-btn']} onClick={() => setShowEditProjectModal(false)}>Cancel</button>
+                <button 
+                  className={`${styles['action-btn']} ${styles['check-btn']}`}
+                  onClick={handleUpdateProject}
+                  disabled={!editTitle.trim() || !editDescription.trim()}
+                >
+                  Save Changes
+                </button>
               </div>
             </div>
           </div>

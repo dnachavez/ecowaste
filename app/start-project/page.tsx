@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ref, push, set } from 'firebase/database';
+import { db } from '../../lib/firebase';
+import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
@@ -12,6 +15,7 @@ interface MaterialInput {
   id: string;
   name: string;
   quantity: string;
+  unit: string;
 }
 
 const generateId = () => {
@@ -20,19 +24,21 @@ const generateId = () => {
 
 export default function StartProjectPage() {
   const router = useRouter();
+  const { user } = useAuth();
   
   // Form State
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [materials, setMaterials] = useState<MaterialInput[]>([
-    { id: '1', name: '', quantity: '' }
+    { id: '1', name: '', quantity: '', unit: '' }
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Handlers
   const handleAddMaterial = () => {
     setMaterials((prevMaterials) => [
       ...prevMaterials,
-      { id: generateId(), name: '', quantity: '' }
+      { id: generateId(), name: '', quantity: '', unit: '' }
     ]);
   };
 
@@ -42,15 +48,20 @@ export default function StartProjectPage() {
     }
   };
 
-  const handleMaterialChange = (id: string, field: 'name' | 'quantity', value: string) => {
+  const handleMaterialChange = (id: string, field: 'name' | 'quantity' | 'unit', value: string) => {
     setMaterials(materials.map(m => 
       m.id === id ? { ...m, [field]: value } : m
     ));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) {
+      alert('You must be logged in to create a project.');
+      return;
+    }
+
     // Basic validation
     if (!projectName.trim() || !projectDescription.trim()) {
       alert('Please fill in all required fields.');
@@ -63,20 +74,45 @@ export default function StartProjectPage() {
       return;
     }
 
-    // In a real app, we would send this data to the backend/API
-    console.log('Creating project:', {
-      projectName,
-      projectDescription,
-      materials: validMaterials
-    });
+    // Process materials to ensure they match the structure expected by Firebase
+    const processedMaterials = validMaterials.map(m => ({
+      id: m.id,
+      name: m.name,
+      needed: parseInt(m.quantity) || 0,
+      unit: m.unit || 'units',
+      acquired: 0,
+      is_found: false,
+      is_completed: false
+    }));
 
-    // For now, just redirect back to projects page
-    // We could pass query params or use context to show the new project, 
-    // but without a real backend or global state store, it won't persist easily.
-    // The previous projects page used local state which resets on navigation.
-    
-    alert('Project created successfully!');
-    router.push('/projects');
+    setIsSubmitting(true);
+
+    try {
+      const projectsRef = ref(db, 'projects');
+      const newProjectRef = push(projectsRef);
+      
+      const projectData = {
+        id: newProjectRef.key,
+        title: projectName,
+        description: projectDescription,
+        materials: processedMaterials,
+        authorId: user.uid,
+        authorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
+        createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+        status: 'active',
+        workflow_stage: 1
+      };
+
+      await set(newProjectRef, projectData);
+      
+      alert('Project created successfully!');
+      router.push('/projects');
+    } catch (error) {
+      console.error('Error creating project:', error);
+      alert('Failed to create project. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -137,6 +173,12 @@ export default function StartProjectPage() {
                     value={material.quantity}
                     onChange={(e) => handleMaterialChange(material.id, 'quantity', e.target.value)}
                   />
+                  <input 
+                    type="text" 
+                    placeholder="Unit (e.g. pcs, kg)" 
+                    value={material.unit}
+                    onChange={(e) => handleMaterialChange(material.id, 'unit', e.target.value)}
+                  />
                   <button 
                     type="button" 
                     className={`${styles.btn} ${styles['remove-material']}`}
@@ -160,8 +202,8 @@ export default function StartProjectPage() {
             <Link href="/projects" className={`${styles.btn} ${styles['btn-secondary']}`}>
               Cancel
             </Link>
-            <button type="submit" className={`${styles.btn} ${styles['btn-primary']}`}>
-              Create Project
+            <button type="submit" className={`${styles.btn} ${styles['btn-primary']}`} disabled={isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Create Project'}
             </button>
           </div>
         </form>

@@ -1,18 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { ref, onValue, query, orderByChild, equalTo } from 'firebase/database';
+import { db } from '../../lib/firebase';
+import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './projects.module.css';
 
-// Mock Data Interfaces
+// Data Interfaces
 interface Material {
   id: string;
   name: string;
-  unit: string;
-  is_found: boolean;
+  quantity: string;
+  unit?: string;
+  is_found?: boolean;
 }
 
 interface Step {
@@ -27,32 +31,20 @@ interface Project {
   id: string;
   title: string;
   description: string;
-  created_at: string;
-  status: 'collecting' | 'in-progress' | 'completed';
+  createdAt: number;
+  status: 'active' | 'collecting' | 'in-progress' | 'completed';
   materials: Material[];
-  steps: Step[];
+  steps?: Step[];
+  authorId: string;
 }
-
-// Initial Mock Data
-const INITIAL_PROJECTS: Project[] = [
-  {
-    id: '25',
-    title: 'Plastic Bottle Vase',
-    description: 'Vase made out of plastic bottles',
-    created_at: '2025-12-07',
-    status: 'in-progress',
-    materials: [
-      { id: 'm1', name: 'plastic bottles', unit: '3 pcs', is_found: false }
-    ],
-    steps: []
-  }
-];
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
   // State
-  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'in-progress' | 'completed'>('all');
   
   // UI State
@@ -61,6 +53,37 @@ export default function ProjectsPage() {
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (user) {
+      const projectsRef = ref(db, 'projects');
+      const userProjectsQuery = query(projectsRef, orderByChild('authorId'), equalTo(user.uid));
+
+      const unsubscribe = onValue(userProjectsQuery, (snapshot) => {
+        if (snapshot.exists()) {
+          const projectsData = snapshot.val();
+          const projectsList = Object.values(projectsData) as Project[];
+          // Sort by createdAt descending
+          projectsList.sort((a, b) => b.createdAt - a.createdAt);
+          setProjects(projectsList);
+        } else {
+          setProjects([]);
+        }
+        setLoading(false);
+      }, (error) => {
+        console.error("Error fetching projects:", error);
+        setLoading(false);
+      });
+
+      return () => unsubscribe();
+    } else {
+      // Avoid setting state synchronously
+      const timer = setTimeout(() => setLoading(false), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [user, authLoading]);
 
   // Handlers
   const handleViewDetails = (project: Project) => {
@@ -136,24 +159,30 @@ export default function ProjectsPage() {
           </div>
           
           <div className={styles['projects-container']}>
-            {filteredProjects.length > 0 ? (
+            {loading ? (
+              <div className={styles['empty-state']}>
+                <p>Loading projects...</p>
+              </div>
+            ) : filteredProjects.length > 0 ? (
               filteredProjects.map(project => (
                 <div key={project.id} className={styles['project-card']}>
                   <div className={styles['project-card-content']}>
                     <div className={styles['project-header']}>
                       <h3>{project.title}</h3>
-                      <span className={styles['project-date']}>Created: {project.created_at}</span>
+                      <span className={styles['project-date']}>
+                        Created: {new Date(project.createdAt).toLocaleDateString()}
+                      </span>
                     </div>
                     <div className={styles['project-description']}>
                       {project.description}
                     </div>
                     <div className={styles['project-materials']}>
-                      <h4>Materials ({project.materials.length}):</h4>
+                      <h4>Materials ({project.materials?.length || 0}):</h4>
                       <ul>
-                        {project.materials.slice(0, 3).map(m => (
-                          <li key={m.id}>{m.name}</li>
+                        {project.materials?.slice(0, 3).map(m => (
+                          <li key={m.id}>{m.name} {m.quantity ? `(${m.quantity})` : ''}</li>
                         ))}
-                        {project.materials.length > 3 && <li>...</li>}
+                        {(project.materials?.length || 0) > 3 && <li>...</li>}
                       </ul>
                     </div>
                   </div>

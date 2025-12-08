@@ -49,9 +49,11 @@ export default function Browse() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('category');
+  const searchParam = searchParams.get('search');
   
   const [activeTab, setActiveTab] = useState('donations');
   const [activeCategory, setActiveCategory] = useState(categoryParam || 'All');
+  const [searchQuery, setSearchQuery] = useState(searchParam || '');
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [showRequestPopup, setShowRequestPopup] = useState(false);
@@ -124,8 +126,11 @@ export default function Browse() {
     if (categoryParam && categoryParam !== activeCategory) {
         setActiveCategory(categoryParam);
     }
+    if (searchParam && searchParam !== searchQuery) {
+        setSearchQuery(searchParam);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryParam]);
+  }, [categoryParam, searchParam]);
 
   const handleCommentInputChange = (donationId: string, value: string) => {
     setCommentInputs(prev => ({
@@ -217,9 +222,18 @@ export default function Browse() {
   // Mock Data
   const categories = ['All', 'Plastic', 'Paper', 'Metal', 'Glass', 'Electronic', 'Other'];
 
-  const filteredDonations = activeCategory === 'All' 
+  const filteredDonations = (activeCategory === 'All' 
     ? allDonations 
-    : allDonations.filter(d => d.category === activeCategory);
+    : allDonations.filter(d => d.category === activeCategory)
+  ).filter(d => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      d.description.toLowerCase().includes(query) ||
+      d.category.toLowerCase().includes(query) ||
+      d.subCategory.toLowerCase().includes(query)
+    );
+  });
 
   const recycledIdeas = [
     {
@@ -252,7 +266,13 @@ export default function Browse() {
       <main className={styles.mainContent}>
         <div className={styles.searchBar}>
             <form onSubmit={(e) => e.preventDefault()}>
-                <input type="text" name="search" placeholder="Search Donations..." />
+                <input 
+                  type="text" 
+                  name="search" 
+                  placeholder="Search Donations..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
                 <button type="submit">Search</button>
             </form>
         </div>
