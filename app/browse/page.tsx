@@ -8,7 +8,8 @@ import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './browse.module.css';
 import { db } from '../../lib/firebase';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, push, set } from 'firebase/database';
+import { useAuth } from '../../context/AuthContext';
 
 interface Comment {
   id: number;
@@ -45,6 +46,7 @@ interface FirebaseDonation {
 }
 
 export default function Browse() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('category');
   
@@ -139,9 +141,36 @@ export default function Browse() {
 
   const handleRequestSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      // Logic to submit request would go here
-      setShowRequestPopup(false);
-      setShowSuccessPopup(true);
+      
+      if (!user || !selectedDonation) return;
+
+      const requestsRef = ref(db, 'requests');
+      const newRequestRef = push(requestsRef);
+      
+      const requestData = {
+          id: newRequestRef.key,
+          donationId: selectedDonation.id,
+          donationTitle: selectedDonation.description ? (selectedDonation.description.substring(0, 50) + (selectedDonation.description.length > 50 ? '...' : '')) : 'Donation',
+          donationCategory: selectedDonation.category,
+          donationImage: selectedDonation.images && selectedDonation.images.length > 0 ? selectedDonation.images[0] : '',
+          requesterId: user.uid,
+          requesterName: user.displayName || user.email || 'Anonymous',
+          requesterAvatar: user.photoURL || '',
+          ownerId: selectedDonation.user.id,
+          status: 'pending',
+          quantity: requestQuantity,
+          createdAt: Date.now()
+      };
+
+      set(newRequestRef, requestData)
+          .then(() => {
+              setShowRequestPopup(false);
+              setShowSuccessPopup(true);
+          })
+          .catch((error) => {
+              console.error("Error creating request:", error);
+              alert("Failed to submit request.");
+          });
   };
 
   // Mock Data

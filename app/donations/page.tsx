@@ -1,13 +1,124 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './donations.module.css';
+import { db } from '../../lib/firebase';
+import { ref, query, orderByChild, equalTo, onValue, update } from 'firebase/database';
+import { useAuth } from '../../context/AuthContext';
+
+interface Donation {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  category: string;
+  subCategory: string;
+  quantity: string;
+  unit: string;
+  description: string;
+  images: string[];
+  createdAt: string;
+}
+
+interface Request {
+  id: string;
+  donationId: string;
+  donationTitle: string;
+  donationCategory: string;
+  donationImage: string;
+  requesterId: string;
+  requesterName: string;
+  requesterAvatar: string;
+  ownerId: string;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  quantity: number;
+  createdAt: number;
+}
 
 export default function DonationsPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('my-donations');
+  const [myDonations, setMyDonations] = useState<Donation[]>([]);
+  const [requestsForMe, setRequestsForMe] = useState<Request[]>([]);
+  const [myRequests, setMyRequests] = useState<Request[]>([]);
+  
+  // Load data
+  useEffect(() => {
+    if (!user) return;
+
+    // 1. Fetch My Donations
+    const donationsRef = ref(db, 'donations');
+    const myDonationsQuery = query(donationsRef, orderByChild('userId'), equalTo(user.uid));
+    
+    const unsubscribeDonations = onValue(myDonationsQuery, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const loadedDonations = Object.entries(data).map(([key, value]) => {
+           return {
+             id: key,
+             ...(value as Omit<Donation, 'id'>)
+           } as Donation;
+        });
+        setMyDonations(loadedDonations.reverse()); // Newest first
+      } else {
+        setMyDonations([]);
+      }
+    });
+
+    // 2. Fetch Requests for My Donations (where ownerId == myId)
+    const requestsRef = ref(db, 'requests');
+    const requestsForMeQuery = query(requestsRef, orderByChild('ownerId'), equalTo(user.uid));
+
+    const unsubscribeRequestsForMe = onValue(requestsForMeQuery, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const loadedRequests = Object.entries(data).map(([key, value]) => {
+           return {
+             id: key,
+             ...(value as Omit<Request, 'id'>)
+           } as Request;
+        });
+        setRequestsForMe(loadedRequests.reverse());
+      } else {
+        setRequestsForMe([]);
+      }
+    });
+
+    // 3. Fetch My Requested Donations (where requesterId == myId)
+    const myRequestsQuery = query(requestsRef, orderByChild('requesterId'), equalTo(user.uid));
+
+    const unsubscribeMyRequests = onValue(myRequestsQuery, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const loadedRequests = Object.entries(data).map(([key, value]) => {
+           return {
+             id: key,
+             ...(value as Omit<Request, 'id'>)
+           } as Request;
+        });
+        setMyRequests(loadedRequests.reverse());
+      } else {
+        setMyRequests([]);
+      }
+    });
+
+    return () => {
+      unsubscribeDonations();
+      unsubscribeRequestsForMe();
+      unsubscribeMyRequests();
+    };
+  }, [user]);
+
+  const handleUpdateStatus = (requestId: string, newStatus: string) => {
+    const requestRef = ref(db, `requests/${requestId}`);
+    update(requestRef, { status: newStatus })
+      .catch((error) => console.error("Error updating status:", error));
+  };
+
+  const receivedDonations = myRequests.filter(req => req.status === 'approved' || req.status === 'completed');
 
   const descriptions: { [key: string]: string } = {
     "my-donations": "Here are all the donations you created. You can manage them here.",
@@ -62,43 +173,189 @@ export default function DonationsPage() {
             <div className={styles['tab-content-wrapper']}>
                 {activeTab === 'my-donations' && (
                     <div className={styles['tab-content']}>
-                        <div className={styles['donations-grid']}>
+                        {myDonations.length > 0 ? (
+                            <div className={styles['donations-list']}>
+                                {myDonations.map(donation => (
+                                    <div key={donation.id} className={styles['donation-row']}>
+                                        <img 
+                                            src={(donation.images && donation.images.length > 0) ? donation.images[0] : '/placeholder-image.png'} 
+                                            alt={donation.description} 
+                                            className={styles['row-image']}
+                                        />
+                                        <div className={styles['row-content']}>
+                                            <div className={styles['row-header']}>
+                                                <h3 className={styles['row-title']}>{donation.description.substring(0, 50) + (donation.description.length > 50 ? '...' : '')}</h3>
+                                                <span className={styles['category-badge']}>{donation.category}</span>
+                                            </div>
+                                            <div className={styles['row-meta']}>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="fas fa-cube"></i>
+                                                    <span>{donation.quantity} {donation.unit}</span>
+                                                </div>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="far fa-calendar-alt"></i>
+                                                    <span>{new Date(donation.createdAt).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
                             <div className={styles['empty-state']}>
                                 <i className="fas fa-box-open"></i>
                                 <h3>No donations yet</h3>
                                 <p>You haven&apos;t created any donations yet. Start by creating your first donation!</p>
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
 
                 {activeTab === 'requests-for-me' && (
                     <div className={styles['tab-content']}>
-                        <div className={styles['empty-state']}>
-                            <i className="fas fa-users"></i>
-                            <h3>No requests for your donations</h3>
-                            <p>No one has requested your donations yet.</p>
-                        </div>
+                         {requestsForMe.length > 0 ? (
+                            <div className={styles['donations-list']}>
+                                {requestsForMe.map(request => (
+                                    <div key={request.id} className={styles['donation-row']}>
+                                        <img 
+                                            src={request.donationImage || '/placeholder-image.png'} 
+                                            alt={request.donationTitle} 
+                                            className={styles['row-image']}
+                                        />
+                                        <div className={styles['row-content']}>
+                                            <div className={styles['row-header']}>
+                                                <h3 className={styles['row-title']}>Request for: {request.donationTitle}</h3>
+                                                <span className={`${styles['status-badge']} ${styles[`status-${request.status}`]}`}>{request.status}</span>
+                                            </div>
+                                            <div className={styles['row-meta']}>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="fas fa-user"></i>
+                                                    <span>{request.requesterName}</span>
+                                                </div>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="fas fa-cube"></i>
+                                                    <span>Qty: {request.quantity}</span>
+                                                </div>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="far fa-calendar-alt"></i>
+                                                    <span>{new Date(request.createdAt).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {request.status === 'pending' && (
+                                            <div className={styles['row-actions']}>
+                                                <button 
+                                                    className={styles['btn-approve']}
+                                                    onClick={() => handleUpdateStatus(request.id, 'approved')}
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button 
+                                                    className={styles['btn-reject']}
+                                                    onClick={() => handleUpdateStatus(request.id, 'rejected')}
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className={styles['empty-state']}>
+                                <i className="fas fa-users"></i>
+                                <h3>No requests for your donations</h3>
+                                <p>No one has requested your donations yet.</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
                 {activeTab === 'my-requests' && (
                     <div className={styles['tab-content']}>
-                        <div className={styles['empty-state']}>
-                            <i className="fas fa-hand-paper"></i>
-                            <h3>No donation requests</h3>
-                            <p>You haven&apos;t requested any donations yet.</p>
-                        </div>
+                        {myRequests.length > 0 ? (
+                            <div className={styles['donations-list']}>
+                                {myRequests.map(request => (
+                                    <div key={request.id} className={styles['donation-row']}>
+                                        <img 
+                                            src={request.donationImage || '/placeholder-image.png'} 
+                                            alt={request.donationTitle} 
+                                            className={styles['row-image']}
+                                        />
+                                        <div className={styles['row-content']}>
+                                            <div className={styles['row-header']}>
+                                                <h3 className={styles['row-title']}>Request for: {request.donationTitle}</h3>
+                                                <span className={`${styles['status-badge']} ${styles[`status-${request.status}`]}`}>{request.status}</span>
+                                            </div>
+                                            <div className={styles['row-meta']}>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="fas fa-tag"></i>
+                                                    <span>{request.donationCategory}</span>
+                                                </div>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="fas fa-cube"></i>
+                                                    <span>Qty: {request.quantity}</span>
+                                                </div>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="far fa-calendar-alt"></i>
+                                                    <span>{new Date(request.createdAt).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className={styles['empty-state']}>
+                                <i className="fas fa-hand-paper"></i>
+                                <h3>No donation requests</h3>
+                                <p>You haven&apos;t requested any donations yet.</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
                 {activeTab === 'received-donations' && (
                     <div className={styles['tab-content']}>
-                        <div className={styles['empty-state']}>
-                            <i className="fas fa-gift"></i>
-                            <h3>No donations received yet</h3>
-                            <p>You haven&apos;t received any completed donations yet. Once your approved requests are delivered, they will appear here.</p>
-                        </div>
+                        {receivedDonations.length > 0 ? (
+                            <div className={styles['donations-list']}>
+                                {receivedDonations.map(request => (
+                                    <div key={request.id} className={styles['donation-row']}>
+                                        <img 
+                                            src={request.donationImage || '/placeholder-image.png'} 
+                                            alt={request.donationTitle} 
+                                            className={styles['row-image']}
+                                        />
+                                        <div className={styles['row-content']}>
+                                            <div className={styles['row-header']}>
+                                                <h3 className={styles['row-title']}>{request.donationTitle}</h3>
+                                                <span className={`${styles['status-badge']} ${styles['status-received']}`}>Received</span>
+                                            </div>
+                                            <div className={styles['row-meta']}>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="fas fa-tag"></i>
+                                                    <span>{request.donationCategory}</span>
+                                                </div>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="fas fa-cube"></i>
+                                                    <span>Qty: {request.quantity}</span>
+                                                </div>
+                                                <div className={styles['meta-item']}>
+                                                    <i className="far fa-calendar-alt"></i>
+                                                    <span>{new Date(request.createdAt).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className={styles['empty-state']}>
+                                <i className="fas fa-gift"></i>
+                                <h3>No donations received yet</h3>
+                                <p>You haven&apos;t received any completed donations yet. Once your approved requests are delivered, they will appear here.</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
