@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
+import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './profile.module.css';
 
 export default function ProfilePage() {
@@ -105,6 +106,7 @@ export default function ProfilePage() {
   };
 
   return (
+    <ProtectedRoute>
     <div style={{ backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
       <Header />
       
@@ -449,6 +451,7 @@ export default function ProfilePage() {
         </div>
       )}
     </div>
+    </ProtectedRoute>
   );
 }
 
