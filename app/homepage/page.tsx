@@ -52,6 +52,16 @@ export default function Homepage() {
   // Popup state
   const [showDonationPopup, setShowDonationPopup] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [showRequestPopup, setShowRequestPopup] = useState(false);
+  const [showRequestSuccessPopup, setShowRequestSuccessPopup] = useState(false);
+  const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null);
+
+  // Request Form state
+  const [requestFormData, setRequestFormData] = useState({
+    quantityClaim: 1,
+    projectId: '',
+    urgencyLevel: 'High'
+  });
   
   // Form state
   const [formData, setFormData] = useState({
@@ -140,6 +150,67 @@ export default function Homepage() {
   const handleClosePopup = () => {
     setShowDonationPopup(false);
     setShowSuccessPopup(false);
+    setShowRequestPopup(false);
+    setShowRequestSuccessPopup(false);
+    setSelectedDonation(null);
+    setRequestFormData({
+      quantityClaim: 1,
+      projectId: '',
+      urgencyLevel: 'High'
+    });
+  };
+
+  const handleRequestClick = (donation: Donation) => {
+    setSelectedDonation(donation);
+    setShowRequestPopup(true);
+    // Reset quantity to 1 when opening
+    setRequestFormData(prev => ({ ...prev, quantityClaim: 1 }));
+  };
+
+  const handleRequestInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setRequestFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const adjustQuantity = (amount: number) => {
+    setRequestFormData(prev => {
+        const newQuantity = Math.max(1, prev.quantityClaim + amount);
+        // If we had a max quantity check, we'd add it here. 
+        // Assuming donation.quantity is a string like "7", we should parse it.
+        // But for now just preventing < 1.
+        return { ...prev, quantityClaim: newQuantity };
+    });
+  };
+
+  const handleRequestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !selectedDonation) return;
+
+    try {
+        const requestData = {
+            donationId: selectedDonation.id,
+            requesterId: user.uid,
+            requesterName: user.displayName || 'Anonymous',
+            requesterAvatar: user.photoURL || 'U',
+            quantityClaimed: requestFormData.quantityClaim,
+            projectId: requestFormData.projectId,
+            urgencyLevel: requestFormData.urgencyLevel,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+        };
+
+        const requestsRef = ref(db, 'requests');
+        await push(requestsRef, requestData);
+
+        setShowRequestPopup(false);
+        setShowRequestSuccessPopup(true);
+    } catch (error) {
+        console.error("Error submitting request: ", error);
+        alert("Failed to submit request.");
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -361,7 +432,7 @@ export default function Homepage() {
                     </div>
 
                     <div className={styles.donationActions}>
-                      <button type="button" className={styles.requestBtn}>
+                      <button type="button" className={styles.requestBtn} onClick={() => handleRequestClick(donation)}>
                         Request Donation
                       </button>
 
@@ -573,6 +644,83 @@ export default function Homepage() {
           <p>You’ve successfully donated your waste materials! 🎉<br />
             Please wait for others to claim your donation.
           </p>
+          <button className={styles.continueBtn} onClick={handleClosePopup}>Continue</button>
+        </div>
+      </div>
+    )}
+
+    {showRequestPopup && selectedDonation && (
+      <div className={styles.popupContainer} onClick={(e) => {
+        if (e.target === e.currentTarget) handleClosePopup();
+      }}>
+        <div className={styles.popupContent}>
+          <button className={styles.closeBtn} onClick={handleClosePopup}>×</button>
+          <h2 style={{ color: '#2e7d32', marginBottom: '15px' }}>Request Materials</h2>
+          
+          <form onSubmit={handleRequestSubmit}>
+            <div className={styles.formGroup}>
+                <label>Waste:</label>
+                <div style={{fontWeight: 500, padding: '8px 0'}}>{selectedDonation.category} - {selectedDonation.subCategory}</div>
+            </div>
+
+            <div className={styles.formGroup}>
+                <label>Available Items:</label>
+                <div style={{fontWeight: 500, padding: '8px 0'}}>{selectedDonation.quantity} {selectedDonation.unit}</div>
+            </div>
+
+            <div className={styles.formGroup}>
+                <label htmlFor="quantityClaim">Quantity to Claim:</label>
+                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                    <button type="button" onClick={() => adjustQuantity(-1)} style={{width:'32px', height:'32px', border:'none', background:'#f0f0f0', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>−</button>
+                    <input 
+                        type="number" 
+                        id="quantityClaim" 
+                        name="quantityClaim" 
+                        value={requestFormData.quantityClaim} 
+                        onChange={handleRequestInputChange}
+                        min="1" 
+                        style={{width:'60px', textAlign:'center', border:'1.5px solid #ccc', borderRadius:'6px', padding:'6px'}} 
+                    />
+                    <button type="button" onClick={() => adjustQuantity(1)} style={{width:'32px', height:'32px', border:'none', background:'#f0f0f0', borderRadius:'6px', cursor:'pointer', fontWeight:'bold'}}>+</button>
+                </div>
+            </div>
+
+            <div className={styles.formGroup}>
+                <label htmlFor="projectId">Recycling Project:</label>
+                <select id="projectId" name="projectId" required value={requestFormData.projectId} onChange={handleRequestInputChange}>
+                  <option value="">Select a project</option>
+                  {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                  ))}
+                </select>
+            </div>
+
+            <div className={styles.formGroup}>
+                <label htmlFor="urgencyLevel">Urgency Level:</label>
+                <select id="urgencyLevel" name="urgencyLevel" required value={requestFormData.urgencyLevel} onChange={handleRequestInputChange}>
+                    <option value="High">High (Immediate Need)</option>
+                    <option value="Medium">Medium (Within 2 weeks)</option>
+                    <option value="Low">Low (Planning ahead)</option>
+                </select>
+            </div>
+
+            <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
+                <button type="submit" className={styles.submitBtn}>Submit Request</button>
+                <button type="button" className={styles.btn} style={{background:'#f0f0f0', color:'#333', border:'1px solid #ddd'}} onClick={handleClosePopup}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+    {showRequestSuccessPopup && (
+      <div className={styles.popupContainer}>
+        <div className={`${styles.popupContent} ${styles.successPopup}`}>
+          <div className={styles.successIcon}>
+            <i className="fas fa-check-circle"></i>
+          </div>
+          <h2>Request Sent!</h2>
+          <p>Your request has been submitted successfully.<br />Please wait for the donor&apos;s response.</p>
           <button className={styles.continueBtn} onClick={handleClosePopup}>Continue</button>
         </div>
       </div>
