@@ -1,17 +1,53 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './homepage.module.css';
+import { db } from '../../lib/firebase';
+import { ref, push, onValue } from 'firebase/database';
+
+interface Comment {
+  id: string;
+  author: string;
+  text: string;
+  time: string;
+}
+
+interface Donation {
+  id: string;
+  user: { name: string; avatar: string | null; id: string };
+  category: string;
+  subCategory: string;
+  timeAgo: string;
+  quantity: string;
+  unit: string;
+  description: string;
+  images: string[];
+  comments: Comment[];
+}
+
+interface FirebaseDonation {
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  category: string;
+  subCategory: string;
+  quantity: string;
+  unit: string;
+  description: string;
+  images: string[];
+  createdAt: string;
+  comments: Comment[];
+}
 
 export default function Homepage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('donations');
-  const [openComments, setOpenComments] = useState<Record<number, boolean>>({});
+  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
 
   // Popup state
   const [showDonationPopup, setShowDonationPopup] = useState(false);
@@ -27,6 +63,8 @@ export default function Homepage() {
     photos: [] as File[]
   });
 
+  const [donations, setDonations] = useState<Donation[]>([]);
+
   const subcategories: Record<string, string[]> = {
     Plastic: ["Plastic Bottles", "Plastic Containers", "Plastic Bags", "Wrappers"],
     Paper: ["Newspapers", "Cardboard", "Magazines", "Office Paper"],
@@ -34,6 +72,66 @@ export default function Homepage() {
     Metal: ["Aluminum Cans", "Tin Cans", "Scrap Metal"],
     Electronic: ["Old Phones", "Chargers", "Batteries", "Broken Gadgets"]
   };
+
+  const calculateTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + " years ago";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + " months ago";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + " days ago";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + " hours ago";
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + " minutes ago";
+    return Math.floor(seconds) + " seconds ago";
+  };
+
+  useEffect(() => {
+    const donationsRef = ref(db, 'donations');
+    const unsubscribe = onValue(donationsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const loadedDonations = Object.entries(data).map(([key, value]) => {
+            const donation = value as FirebaseDonation;
+            return {
+                id: key,
+                user: { 
+                    name: donation.userName, 
+                    avatar: donation.userAvatar, 
+                    id: donation.userId 
+                },
+                category: donation.category,
+                subCategory: donation.subCategory,
+                timeAgo: calculateTimeAgo(donation.createdAt),
+                quantity: donation.quantity,
+                unit: donation.unit || 'Units',
+                description: donation.description,
+                images: donation.images || [],
+                comments: donation.comments || []
+            };
+        });
+        // Sort by date desc
+        loadedDonations.sort(() => {
+           // We need the raw createdAt to sort correctly, but since we didn't keep it in the mapped object, 
+           // we can either keep it or just rely on the order if firebase returns it sorted (it usually does by key).
+           // However, to be safe, let's look at the original data logic or just assume latest first if keys are time-based (push IDs are).
+           // Actually, push IDs are chronological. So reversing the array should show newest first.
+           return 0; 
+        }).reverse();
+        setDonations(loadedDonations);
+      } else {
+        setDonations([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
 
   const handleDonateClick = () => {
     setShowDonationPopup(true);
@@ -54,74 +152,86 @@ export default function Homepage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFormData(prev => ({
-        ...prev,
-        photos: Array.from(e.target.files || [])
-      }));
+      const newFiles = Array.from(e.target.files);
+      setFormData(prev => {
+          const updatedPhotos = [...prev.photos, ...newFiles].slice(0, 4); // Limit to 4
+          return {
+            ...prev,
+            photos: updatedPhotos
+          };
+      });
+      // Clear the input so the same file can be selected again if needed
+      e.target.value = ''; 
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate submission
-    setShowDonationPopup(false);
-    setShowSuccessPopup(true);
-    // Reset form
-    setFormData({
-      wasteType: '',
-      otherWaste: '',
-      subcategory: '',
-      quantity: '',
-      description: '',
-      photos: []
-    });
+  const handleRemovePhoto = (index: number) => {
+    setFormData(prev => ({
+        ...prev,
+        photos: prev.photos.filter((_, i) => i !== index)
+    }));
   };
 
-  const toggleComments = (id: number) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    try {
+      // Convert photos to base64
+      const imagePromises = formData.photos.map(file => {
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      });
+
+      const base64Images = await Promise.all(imagePromises);
+
+      const donationData = {
+        userId: user.uid, 
+        userName: user.displayName || 'Anonymous', 
+        userAvatar: user.photoURL || 'U', 
+        category: formData.wasteType,
+        subCategory: formData.subcategory,
+        quantity: formData.quantity,
+        unit: 'Units',
+        description: formData.description,
+        images: base64Images,
+        createdAt: new Date().toISOString(),
+        comments: []
+      };
+
+      const donationsRef = ref(db, 'donations');
+      await push(donationsRef, donationData);
+
+      setShowDonationPopup(false);
+      setShowSuccessPopup(true);
+      
+      // Reset form
+      setFormData({
+        wasteType: '',
+        otherWaste: '',
+        subcategory: '',
+        quantity: '',
+        description: '',
+        photos: []
+      });
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`Error posting donation: ${errorMessage}`);
+    }
+  };
+
+  const toggleComments = (id: string) => {
     setOpenComments(prev => ({
       ...prev,
       [id]: !prev[id]
     }));
   };
 
-  const donations = [
-    {
-      id: 106,
-      user: { name: 'Lucas', avatar: 'L', id: 21 },
-      category: 'Paper',
-      subCategory: 'Cardboard',
-      timeAgo: '3 days ago',
-      quantity: '3/3',
-      unit: 'Units',
-      description: '3 Clean unused cardboards.',
-      images: [], // We don't have the actual images, so I'll leave empty or put placeholders if needed
-      comments: []
-    },
-    {
-      id: 103,
-      user: { name: 'Princess', avatar: 'P', id: 18 },
-      category: 'Plastic',
-      subCategory: 'Plastic Bags',
-      timeAgo: '12 days ago',
-      quantity: '2/3',
-      unit: 'Units',
-      description: '3 clean plastic bags',
-      images: [],
-      comments: []
-    },
-    {
-      id: 93,
-      user: { name: 'Haruka', avatar: 'H', id: 12 },
-      category: 'Metal',
-      subCategory: 'Aluminum Cans',
-      timeAgo: '17 days ago',
-      quantity: '3/3',
-      unit: 'Units',
-      description: '3 clean aluminum cans',
-      images: [],
-      comments: []
-    }
-  ];
 
   const recycledIdeas = [
     {
@@ -202,11 +312,22 @@ export default function Homepage() {
             <div className={styles.sectionCard} style={{background: 'none', boxShadow: 'none', padding: 0}}>
               <h3 style={{ color: '#2e8b57', marginBottom: '15px', fontSize: '18px', fontFamily: 'Montserrat, sans-serif', textTransform: 'uppercase', fontWeight: 700 }}>Available Donations</h3>
               <div id="availableDonationsContainer">
+                {donations.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#f9f9f9', borderRadius: '8px', color: '#666' }}>
+                        <i className="fas fa-box-open" style={{ fontSize: '48px', marginBottom: '15px', color: '#ccc' }}></i>
+                        <p style={{ fontSize: '16px', fontWeight: 500 }}>No donations found</p>
+                        <p style={{ fontSize: '14px', marginTop: '5px' }}>Be the first to donate waste materials!</p>
+                    </div>
+                )}
                 {donations.map(donation => (
                   <div key={donation.id} className={styles.donationPost}>
                     <div className={styles.donationUserHeader}>
                       <div className={styles.userAvatar}>
-                        {donation.user.avatar}
+                        {donation.user.avatar && (donation.user.avatar.startsWith('http') || donation.user.avatar.startsWith('/')) ? (
+                            <img src={donation.user.avatar} alt={donation.user.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                        ) : (
+                            donation.user.avatar
+                        )}
                       </div>
                       <div className={styles.userInfo}>
                         <div className={styles.userName}>
@@ -234,7 +355,9 @@ export default function Homepage() {
 
                     {/* Images placeholder */}
                     <div className={styles.donationImages}>
-                       {/* Add placeholder images if needed */}
+                       {donation.images && donation.images.map((img, index) => (
+                         <img key={index} src={img} alt={`Donation ${index + 1}`} style={{ maxWidth: '100px', maxHeight: '100px', margin: '5px', borderRadius: '4px' }} />
+                       ))}
                     </div>
 
                     <div className={styles.donationActions}>
@@ -407,6 +530,29 @@ export default function Homepage() {
                   <label htmlFor="photos" className={styles.fileUploadLabel}>Choose Files</label>
                   <span id="file-chosen">{formData.photos.length > 0 ? `${formData.photos.length} files selected` : 'No files chosen'}</span>
                 </div>
+                
+                {formData.photos.length > 0 && (
+                    <div className={styles.previewContainer}>
+                        {formData.photos.map((photo, index) => (
+                            <div key={index} className={styles.previewImageWrapper}>
+                                <img 
+                                    src={URL.createObjectURL(photo)} 
+                                    alt={`Preview ${index}`} 
+                                    className={styles.previewImage} 
+                                    onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+                                />
+                                <button 
+                                    type="button" 
+                                    className={styles.removeImageBtn}
+                                    onClick={() => handleRemovePhoto(index)}
+                                >
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                
                 <small className={styles.formHint}>You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
               </div>
 

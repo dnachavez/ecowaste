@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '../../context/AuthContext';
+import { useSearchParams } from 'next/navigation';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './browse.module.css';
+import { db } from '../../lib/firebase';
+import { ref, onValue } from 'firebase/database';
 
 interface Comment {
   id: number;
@@ -17,8 +18,8 @@ interface Comment {
 }
 
 interface Donation {
-  id: number;
-  user: { name: string; avatar: string; id: number };
+  id: string;
+  user: { name: string; avatar: string | null; id: string };
   category: string;
   subCategory: string;
   timeAgo: string;
@@ -29,18 +30,87 @@ interface Donation {
   comments: Comment[];
 }
 
+interface FirebaseDonation {
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  category: string;
+  subCategory: string;
+  quantity: string;
+  unit: string;
+  description: string;
+  images: string[];
+  createdAt: string;
+  comments: Comment[];
+}
+
 export default function Browse() {
-  const { user } = useAuth();
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('category');
   
   const [activeTab, setActiveTab] = useState('donations');
   const [activeCategory, setActiveCategory] = useState(categoryParam || 'All');
-  const [openComments, setOpenComments] = useState<Record<number, boolean>>({});
+  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [showRequestPopup, setShowRequestPopup] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null);
   const [requestQuantity, setRequestQuantity] = useState(1);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [allDonations, setAllDonations] = useState<Donation[]>([]);
+
+  const calculateTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + " years ago";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + " months ago";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + " days ago";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + " hours ago";
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + " minutes ago";
+    return Math.floor(seconds) + " seconds ago";
+  };
+
+  useEffect(() => {
+    const donationsRef = ref(db, 'donations');
+    const unsubscribe = onValue(donationsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const loadedDonations = Object.entries(data).map(([key, value]) => {
+            const donation = value as FirebaseDonation;
+            return {
+                id: key,
+                user: { 
+                    name: donation.userName, 
+                    avatar: donation.userAvatar, 
+                    id: donation.userId 
+                },
+                category: donation.category,
+                subCategory: donation.subCategory,
+                timeAgo: calculateTimeAgo(donation.createdAt),
+                quantity: donation.quantity,
+                unit: donation.unit || 'Units',
+                description: donation.description,
+                images: donation.images || [],
+                comments: donation.comments || []
+            };
+        });
+        // Sort by date desc
+        loadedDonations.sort(() => {
+           return 0; 
+        }).reverse();
+        setAllDonations(loadedDonations);
+      } else {
+        setAllDonations([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (categoryParam && categoryParam !== activeCategory) {
@@ -49,7 +119,7 @@ export default function Browse() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryParam]);
 
-  const toggleComments = (id: number) => {
+  const toggleComments = (id: string) => {
     setOpenComments(prev => ({
       ...prev,
       [id]: !prev[id]
@@ -76,45 +146,6 @@ export default function Browse() {
 
   // Mock Data
   const categories = ['All', 'Plastic', 'Paper', 'Metal', 'Glass', 'Electronic', 'Other'];
-
-  const allDonations: Donation[] = [
-    {
-      id: 106,
-      user: { name: 'Lucas', avatar: 'L', id: 21 },
-      category: 'Paper',
-      subCategory: 'Cardboard',
-      timeAgo: '3 days ago',
-      quantity: '3/3',
-      unit: 'Units',
-      description: '3 Clean unused cardboards.',
-      images: [],
-      comments: []
-    },
-    {
-      id: 103,
-      user: { name: 'Princess', avatar: 'P', id: 18 },
-      category: 'Plastic',
-      subCategory: 'Plastic Bags',
-      timeAgo: '12 days ago',
-      quantity: '3/3',
-      unit: 'Units',
-      description: '3 clean plastic bags',
-      images: [],
-      comments: []
-    },
-    {
-      id: 93,
-      user: { name: 'Haruka', avatar: 'H', id: 12 },
-      category: 'Metal',
-      subCategory: 'Aluminum Cans',
-      timeAgo: '17 days ago',
-      quantity: '3/3',
-      unit: 'Units',
-      description: '3 clean aluminum cans',
-      images: [],
-      comments: []
-    }
-  ];
 
   const filteredDonations = activeCategory === 'All' 
     ? allDonations 
@@ -194,11 +225,23 @@ export default function Browse() {
                 <div className={styles.sectionCard}>
                     <h3 style={{ color: '#2e8b57', marginBottom: '15px', fontSize: '18px', fontFamily: 'Montserrat, sans-serif', textTransform: 'uppercase', fontWeight: 700 }}>Available Donations</h3>
                     <div className="available">
-                        {filteredDonations.length === 0 && <p>No donations found in this category.</p>}
+                        {filteredDonations.length === 0 && (
+                            <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#f9f9f9', borderRadius: '8px', color: '#666' }}>
+                                <i className="fas fa-box-open" style={{ fontSize: '48px', marginBottom: '15px', color: '#ccc' }}></i>
+                                <p style={{ fontSize: '16px', fontWeight: 500 }}>No donations found in this category</p>
+                                <p style={{ fontSize: '14px', marginTop: '5px' }}>Be the first to donate waste materials!</p>
+                            </div>
+                        )}
                         {filteredDonations.map(donation => (
                             <div key={donation.id} className={styles.donationPost}>
                                 <div className={styles.donationUserHeader}>
-                                    <div className={styles.userAvatar}>{donation.user.avatar}</div>
+                                    <div className={styles.userAvatar}>
+                                        {donation.user.avatar && (donation.user.avatar.startsWith('http') || donation.user.avatar.startsWith('/')) ? (
+                                            <img src={donation.user.avatar} alt={donation.user.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                                        ) : (
+                                            donation.user.avatar
+                                        )}
+                                    </div>
                                     <div className={styles.userInfo}>
                                         <div className={styles.userName}>
                                             <Link href={`/profile/${donation.user.id}`} className={styles.profileLink}>
@@ -226,7 +269,9 @@ export default function Browse() {
                                 </div>
 
                                 <div className={styles.donationImages}>
-                                    {/* Add placeholder images if needed */}
+                                   {donation.images && donation.images.map((img, index) => (
+                                     <img key={index} src={img} alt={`Donation ${index + 1}`} style={{ maxWidth: '100px', maxHeight: '100px', margin: '5px', borderRadius: '4px' }} />
+                                   ))}
                                 </div>
 
                                 <div className={styles.donationActions}>

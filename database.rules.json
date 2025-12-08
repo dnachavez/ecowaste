@@ -5,6 +5,10 @@
         ".read": "$uid === auth.uid",
         ".write": "$uid === auth.uid"
       }
+    },
+    "donations": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }
 }
