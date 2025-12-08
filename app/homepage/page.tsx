@@ -44,6 +44,28 @@ interface FirebaseDonation {
   comments?: Record<string, Omit<Comment, 'id'>>;
 }
 
+interface RecycledIdea {
+  id: string;
+  title: string;
+  author: string;
+  timeAgo: string;
+  image: string;
+  description: string;
+  commentsCount: number;
+}
+
+interface FirebaseProject {
+  id: string;
+  title: string;
+  description: string;
+  authorName: string;
+  createdAt: string;
+  final_images?: string[];
+  visibility?: 'private' | 'public';
+  status?: string;
+  // ... other fields
+}
+
 export default function Homepage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('donations');
@@ -56,6 +78,8 @@ export default function Homepage() {
   const [showRequestPopup, setShowRequestPopup] = useState(false);
   const [showRequestSuccessPopup, setShowRequestSuccessPopup] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null);
+
+  const [recycledIdeas, setRecycledIdeas] = useState<RecycledIdea[]>([]);
 
   // Request Form state
   const [requestFormData, setRequestFormData] = useState({
@@ -345,26 +369,38 @@ export default function Homepage() {
   };
 
 
-  const recycledIdeas = [
-    {
-      id: 2,
-      title: 'Newspaper Flower',
-      author: 'Hanner Kaminari',
-      timeAgo: '2 days ago',
-      image: '/uploads/project_final_images/final_6932c4015b4233.72797426_1764934657.jpg', // Placeholder path
-      description: 'Cute Newspaper flower',
-      commentsCount: 0
-    },
-    {
-      id: 1,
-      title: 'Basket',
-      author: 'Hanner Kaminari',
-      timeAgo: '2 days ago',
-      image: '/uploads/project_final_images/final_6932a3de517897.52590104_1764926430.jpg', // Placeholder path
-      description: 'yuttttttttttttttttttttttttttttrar',
-      commentsCount: 0
-    }
-  ];
+  useEffect(() => {
+    const projectsRef = ref(db, 'projects');
+    const unsubscribe = onValue(projectsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const loadedProjects = Object.entries(data)
+            .map(([key, value]) => {
+                const project = value as FirebaseProject;
+                return {
+                    ...project,
+                    id: key
+                };
+            })
+            .filter(project => project.visibility === 'public' && project.final_images && project.final_images.length > 0)
+            .map(project => ({
+                id: project.id,
+                title: project.title,
+                author: project.authorName || 'Anonymous',
+                timeAgo: project.createdAt, // We might want to calculate real time ago if createdAt is ISO string
+                image: project.final_images ? project.final_images[0] : '',
+                description: project.description,
+                commentsCount: 0 // Placeholder
+            }));
+        
+        setRecycledIdeas(loadedProjects);
+      } else {
+        setRecycledIdeas([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const projects = [
       {
@@ -532,10 +568,13 @@ export default function Homepage() {
                         </div>
                     </div>
                     <div className={styles.ideaImageContainer}>
-                        {/* Use a placeholder image or the actual image path if available */}
-                         <div style={{width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e0e0e0', color: '#666'}}>
-                             Image: {idea.title}
-                         </div>
+                        {idea.image ? (
+                            <img src={idea.image} alt={idea.title} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                        ) : (
+                             <div style={{width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e0e0e0', color: '#666'}}>
+                                 No Image
+                             </div>
+                        )}
                     </div>
                     <p className={styles.ideaDescription}>
                         {idea.description}

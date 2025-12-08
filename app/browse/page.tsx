@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import Header from '../../components/Header';
@@ -45,7 +45,29 @@ interface FirebaseDonation {
   comments?: Record<string, Omit<Comment, 'id'>>;
 }
 
-export default function Browse() {
+interface RecycledIdea {
+  id: string;
+  title: string;
+  author: string;
+  timeAgo: string;
+  image: string;
+  description: string;
+  commentsCount: number;
+}
+
+interface FirebaseProject {
+  id: string;
+  title: string;
+  description: string;
+  authorName: string;
+  createdAt: string;
+  final_images?: string[];
+  visibility?: 'private' | 'public';
+  status?: string;
+  // ... other fields
+}
+
+function BrowseContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const categoryParam = searchParams.get('category');
@@ -61,6 +83,7 @@ export default function Browse() {
   const [requestQuantity, setRequestQuantity] = useState(1);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [allDonations, setAllDonations] = useState<Donation[]>([]);
+  const [recycledIdeas, setRecycledIdeas] = useState<RecycledIdea[]>([]);
 
   const calculateTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -235,26 +258,38 @@ export default function Browse() {
     );
   });
 
-  const recycledIdeas = [
-    {
-      id: 2,
-      title: 'Newspaper Flower',
-      author: 'Hanner Kaminari',
-      timeAgo: '2 days ago',
-      image: '/uploads/project_final_images/final_6932c4015b4233.72797426_1764934657.jpg',
-      description: 'Cute Newspaper flower',
-      commentsCount: 0
-    },
-    {
-      id: 1,
-      title: 'Basket',
-      author: 'Hanner Kaminari',
-      timeAgo: '2 days ago',
-      image: '/uploads/project_final_images/final_6932a3de517897.52590104_1764926430.jpg',
-      description: 'yuttttttttttttttttttttttttttttrar',
-      commentsCount: 0
-    }
-  ];
+  useEffect(() => {
+    const projectsRef = ref(db, 'projects');
+    const unsubscribe = onValue(projectsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const loadedProjects = Object.entries(data)
+            .map(([key, value]) => {
+                const project = value as FirebaseProject;
+                return {
+                    ...project,
+                    id: key
+                };
+            })
+            .filter(project => project.visibility === 'public' && project.final_images && project.final_images.length > 0)
+            .map(project => ({
+                id: project.id,
+                title: project.title,
+                author: project.authorName || 'Anonymous',
+                timeAgo: project.createdAt,
+                image: project.final_images ? project.final_images[0] : '',
+                description: project.description,
+                commentsCount: 0 // Placeholder
+            }));
+        
+        setRecycledIdeas(loadedProjects);
+      } else {
+        setRecycledIdeas([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <ProtectedRoute>
@@ -426,9 +461,13 @@ export default function Browse() {
                             </div>
                         </div>
                         <div className={styles.ideaImageContainer}>
-                            <div style={{width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e0e0e0', color: '#666'}}>
-                                Image: {idea.title}
-                            </div>
+                            {idea.image ? (
+                                <img src={idea.image} alt={idea.title} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                            ) : (
+                                <div style={{width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e0e0e0', color: '#666'}}>
+                                    No Image
+                                </div>
+                            )}
                         </div>
                         <p className={styles.ideaDescription}>
                             {idea.description}
@@ -521,5 +560,13 @@ export default function Browse() {
       )}
     </div>
     </ProtectedRoute>
+  );
+}
+
+export default function Browse() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <BrowseContent />
+    </Suspense>
   );
 }

@@ -415,6 +415,13 @@
     background: #2E8B57;
 }
 
+.tab-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #f9f9f9;
+    color: #aaa;
+}
+
 /* Stage Cards */
 .stage-card {
     background: white;
@@ -538,8 +545,7 @@
     margin: 0 0 20px 0;
 }
 
-.material-item,
-.step-item {
+.material-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -550,36 +556,206 @@
     transition: all 0.2s ease;
 }
 
-.material-item:hover,
-.step-item:hover {
+.material-item:hover {
     background: #F0F0F0;
     transform: translateY(-1px);
 }
 
-.material-info,
-.step-info {
+.material-info {
     flex: 1;
 }
 
-.material-name,
-.step-title {
+.material-name {
     font-weight: 600;
     color: #333;
     margin-bottom: 5px;
 }
 
-.material-quantity,
-.step-description {
+.material-quantity {
     font-size: 14px;
     color: #666;
 }
 
+.step-item {
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #e0e0e0;
+}
+
+.step-item:hover {
+    background: #f5f5f5; /* Disable hover effect for the container */
+    transform: none;
+}
+
+.step-header-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.step-title-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+    margin: 0;
+}
+
+.needs-images-badge {
+    background-color: #f0ad4e;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.step-content-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+    align-items: flex-start;
+}
+
+.step-description-box {
+    flex: 1;
+    background: white;
+    padding: 15px 20px;
+    border-radius: 6px;
+    border-left: 5px solid #28a745;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    font-size: 15px;
+    line-height: 1.5;
+    color: #333;
+}
+
+.step-actions-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.add-images-btn {
+    background-color: #4da66d;
+    color: white;
+    font-weight: 600;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+}
+
+.add-images-btn:hover {
+    background-color: #3d8b58;
+}
+
+.delete-step-btn {
+    background-color: #d9534f;
+    color: white;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 6px;
+}
+
+.delete-step-btn:hover {
+    background-color: #c9302c;
+}
+
+.step-images-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.step-image-item {
+    width: 100px;
+    height: 100px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    position: relative; /* For absolute positioning of delete button */
+}
+
+.step-image-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.delete-step-image-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.2s;
+    opacity: 0; /* Hidden by default */
+}
+
+.step-image-item:hover .delete-step-image-btn {
+    opacity: 1; /* Show on hover */
+}
+
+.delete-step-image-btn:hover {
+    background: rgba(255, 0, 0, 1);
+}
+
+.step-images-placeholder {
+    border: 2px dashed #dcdcdc;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    background-color: #f9f9f9;
+}
+
 .stage-actions {
     display: flex;
+    flex-direction: row; /* Changed back to row */
+    align-items: center; /* Align items vertically in the center */
     gap: 15px;
     margin-top: 25px;
     padding-top: 20px;
     border-top: 1px solid #f0f0f0;
+    flex-wrap: wrap; /* Allow wrapping if needed on small screens */
+}
+
+.validation-status {
+    margin-top: 0; /* Remove top margin */
+    display: flex;
+    flex-direction: column;
+    gap: 4px; /* Smaller gap */
+    font-size: 13px; /* Smaller font size */
+    margin-left: 10px; /* Add some spacing from the buttons */
+    border-left: 1px solid #eee; /* Optional: separator */
+    padding-left: 15px;
+}
+
+.validation-item {
+    display: flex;
+    align-items: center;
+    gap: 6px; /* Smaller gap */
 }
 
 /* Back Link */

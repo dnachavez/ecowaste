@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo } from 'firebase/auth';
@@ -9,7 +9,7 @@ import { auth, db } from '../../lib/firebase';
 import { useAuth } from '../../context/AuthContext';
 import styles from './signup.module.css';
 
-export default function SignupPage() {
+function SignupContent() {
   const [isNameDetailsOpen, setIsNameDetailsOpen] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
@@ -395,5 +395,13 @@ export default function SignupPage() {
         <button type="button" className={styles.popupClose} onClick={() => setShowPopup(false)}>×</button>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignupContent />
+    </Suspense>
   );
 }
