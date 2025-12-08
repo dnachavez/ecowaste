@@ -112,7 +112,7 @@ export default function Homepage() {
           <p>Join our community in making the world a cleaner place</p>
           <div className={styles.btnContainer}>
             <button type="button" className={styles.btn}>Donate Waste</button>
-            <Link href="/start_project" className={styles.btn}>Start Recycling</Link>
+            <Link href="/start-project" className={styles.btn}>Start Recycling</Link>
             <Link href="/learn_more" className={styles.btn} style={{ backgroundColor: '#666' }}>Learn More</Link>
           </div>
         </div>
