@@ -7,7 +7,7 @@ import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './profile.module.css';
-import { db, auth } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
 import { ref, onValue, update } from 'firebase/database';
 import { updateProfile } from 'firebase/auth';
 

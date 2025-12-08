@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ref, onValue, update, remove, push, set } from 'firebase/database';
 // import { ref as storageRef, uploadBytes } from 'firebase/storage';
@@ -48,7 +48,6 @@ interface Project {
 
 
 export default function ProjectDetailsPage() {
-  const router = useRouter();
   const params = useParams();
   const [project, setProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<'preparation' | 'construction' | 'share'>('preparation');

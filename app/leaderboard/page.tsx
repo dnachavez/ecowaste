@@ -19,7 +19,7 @@ interface LeaderboardUser {
 }
 
 export default function Leaderboard() {
-  const { user } = useAuth();
+  const { } = useAuth();
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -38,12 +38,16 @@ export default function Leaderboard() {
     const donationsRef = ref(db, 'donations');
     const projectsRef = ref(db, 'projects');
 
-    let usersData: any = {};
-    let donationsData: any = {};
-    let projectsData: any = {};
+    let usersData: Record<string, { fullName?: string }> = {};
+    let donationsData: Record<string, { userId?: string }> = {};
+    let projectsData: Record<string, { authorId?: string; status?: string }> = {};
     const dataLoaded = { users: false, donations: false, projects: false };
 
-    const calculateLeaderboard = (users: any, donations: any, projects: any) => {
+    const calculateLeaderboard = (
+      users: Record<string, { fullName?: string }>,
+      donations: Record<string, { userId?: string }>,
+      projects: Record<string, { authorId?: string; status?: string }>
+    ) => {
       const userPoints: Record<string, number> = {};
   
       // Initialize users with 0 points
@@ -52,14 +56,14 @@ export default function Leaderboard() {
       });
   
       // Calculate points from Donations (e.g., 10 points per donation)
-      Object.values(donations).forEach((donation: any) => {
+      Object.values(donations).forEach((donation) => {
         if (donation.userId && userPoints[donation.userId] !== undefined) {
           userPoints[donation.userId] += 10;
         }
       });
   
       // Calculate points from Completed Projects (e.g., 20 points per completed project)
-      Object.values(projects).forEach((project: any) => {
+      Object.values(projects).forEach((project) => {
         if (project.authorId && project.status === 'completed' && userPoints[project.authorId] !== undefined) {
           userPoints[project.authorId] += 20;
         }
