@@ -201,20 +201,20 @@
   display: flex;
   justify-content: center;
   gap: 15px;
-  margin-top: 20px;
+  margin-top: 15px;
 }
 
 .btn {
-  display: inline-block;
   padding: 10px 20px;
-  background-color: #82AA52;
-  color: white;
   border: none;
   border-radius: 5px;
-  text-decoration: none;
+  color: white;
+  background-color: #82AA52;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.3s;
+  text-decoration: none;
+  display: inline-block;
+  transition: background-color 0.2s;
 }
 
 .btn:hover {
@@ -223,31 +223,40 @@
 
 .tabContainer {
   display: flex;
-  margin-bottom: 15px;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
 .tabBtn {
-  padding: 10px 15px;
-  background: none;
+  padding: 10px 20px;
   border: none;
-  border-bottom: 3px solid transparent;
-  font-weight: bold;
+  background: none;
+  font-weight: 600;
   color: #666;
   cursor: pointer;
-  font-size: 14px;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
 }
 
 .tabBtn.active {
-  color: rgb(4, 144, 4);
-  border-bottom: 3px solid rgb(4, 144, 4);
+  color: #82AA52;
+  border-bottom-color: #82AA52;
+}
+
+.sectionCard {
+  background-color: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
 
 .donationPost {
-  padding: 15px;
-  border: 1px solid #eee;
-  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
   margin-bottom: 20px;
   background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .donationUserHeader {
@@ -289,6 +298,14 @@
   color: #666;
 }
 
+.category {
+  font-weight: 500;
+}
+
+.timeAgo {
+  color: #999;
+}
+
 .quantityInfo {
   display: flex;
   justify-content: space-between;
@@ -327,19 +344,6 @@
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 15px;
-}
-
-.donationImage {
-  width: 80px;
-  height: 80px;
-  object-fit: cover;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.donationImage:hover {
-  transform: scale(1.05);
 }
 
 .donationActions {
@@ -390,221 +394,214 @@
   margin-bottom: 15px;
 }
 
-.comment {
-  padding: 12px;
-  margin-bottom: 10px;
-  background-color: white;
-  border-radius: 6px;
-  border-left: 3px solid #2e8b57;
-}
-
-.commentHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.commentAuthor {
-  font-weight: 600;
-  color: #2e8b57;
-}
-
-.commentTime {
-  font-size: 12px;
-  color: #6c757d;
-}
-
-.commentText {
-  color: #333;
-  margin: 0;
-  line-height: 1.4;
-}
-
-.addComment {
-  margin-top: 15px;
-}
-
-.commentTextarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #ced4da;
-  border-radius: 6px;
-  resize: vertical;
-  min-height: 80px;
-  font-family: 'Open Sans', sans-serif;
-  margin-bottom: 10px;
-}
-
-.commentTextarea:focus {
-  outline: none;
-  border-color: #2e8b57;
-  box-shadow: 0 0 0 3px rgba(46, 139, 87, 0.1);
-}
-
-.postCommentBtn {
-  padding: 8px 16px;
-  background-color: #2e8b57;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background-color 0.3s;
-}
-
-.postCommentBtn:hover {
-  background-color: #3cb371;
-}
-
 .noComments {
   text-align: center;
   color: #6c757d;
   font-style: italic;
-  padding: 20px;
+  padding: 10px;
 }
 
-@media (max-width: 768px) {
-  .header {
-    min-height: 70px;
-    height: 70px;
-    padding: 0 15px;
-  }
-  
-  .logo img {
-    width: 55px;
-    height: 55px;
-  }
-  
-  .profilePic {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .sidebar,
-  .rightSidebar {
-    top: 70px;
-    height: calc(100vh - 70px);
-    display: none; /* Hide sidebar on small screens for now */
-  }
-  
-  .container {
-    grid-template-columns: 1fr;
-  }
-
-  .mainContent {
-    grid-column: 1 / -1;
-  }
-}
-
-/* Recycled Ideas Styles */
-.ideaCard {
-  background-color: white;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 20px;
-  border: 1px solid #eee;
-}
-
-.ideaHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 15px;
-}
-
-.ideaHeader h3 {
-  margin: 0;
-  color: #333;
-  font-size: 18px;
-}
-
-.ideaMeta {
+.addComment {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  font-size: 13px;
+  gap: 10px;
 }
 
-.author {
-  font-weight: 600;
-  color: #2e8b57;
-}
-
-.timeAgo {
-  color: #999;
-}
-
-.ideaImageContainer {
+.commentTextarea {
   width: 100%;
-  height: 200px;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 15px;
-  background-color: #f0f0f0;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 60px;
 }
 
-.ideaImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.ideaDescription {
-  color: #555;
-  margin-bottom: 15px;
-  line-height: 1.5;
-}
-
-.ideaActions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid #eee;
-  padding-top: 15px;
-}
-
-.actionBtn {
+.postCommentBtn {
+  align-self: flex-end;
+  padding: 8px 16px;
   background-color: #2e8b57;
   color: white;
   border: none;
   border-radius: 4px;
-  padding: 8px 16px;
+  cursor: pointer;
   font-weight: 600;
+}
+
+/* Popup Styles */
+.popupContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.popupContent {
+  background-color: white;
+  border-radius: 12px;
+  padding: 30px;
+  width: 90%;
+  max-width: 500px;
+  position: relative;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.closeBtn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  font-size: 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+}
+
+.popupScrollArea {
+  overflow-y: auto;
+  padding-right: 10px;
+  margin-top: 10px;
+}
+
+.formGroup {
+  margin-bottom: 20px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+}
+
+.formGroup select,
+.formGroup input,
+.formGroup textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.fileUpload {
+  border: 2px dashed #ddd;
+  padding: 20px;
+  text-align: center;
+  border-radius: 6px;
+  position: relative;
+  background-color: #fafafa;
+}
+
+.fileUpload input[type="file"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.fileUploadLabel {
+  display: inline-block;
+  padding: 8px 16px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.formHint {
+  display: block;
+  color: #666;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.submitBtn {
+  width: 100%;
+  padding: 12px;
+  background-color: #2e8b57;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 16px;
   cursor: pointer;
   transition: background-color 0.3s;
 }
 
-.actionBtn:hover {
-  background-color: #3cb371;
+.submitBtn:hover {
+  background-color: #246d44;
 }
 
-.comments {
-  color: #666;
-  font-size: 14px;
+.successPopup {
+  text-align: center;
+  padding: 40px;
+}
+
+.successIcon {
+  width: 80px;
+  height: 80px;
+  background-color: #e8f5e9;
+  color: #2e8b57;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  margin: 0 auto 20px;
+}
+
+.continueBtn {
+  background-color: #2e8b57;
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: transform 0.2s;
+}
+
+.continueBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(46, 139, 87, 0.3);
 }
 
 /* Right Sidebar Styles */
 .card {
   background-color: white;
-  border-radius: 8px;
-  padding: 15px;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
   margin-bottom: 20px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
 .card h2, .card h3 {
-  color: #2e8b57;
-  font-size: 18px;
+  color: #82AA52;
   margin-bottom: 10px;
+  font-size: 18px;
 }
 
-.projectsScroll {
-  max-height: 300px;
+.projectsScroll, .leaderboardScroll {
+  max-height: 250px;
   overflow-y: auto;
+  padding-right: 5px;
 }
 
-.projectItemLink {
+.projectItemLink, .leaderboardItemLink {
   text-decoration: none;
   color: inherit;
   display: block;
@@ -613,30 +610,27 @@
 
 .projectItem {
   padding: 10px;
-  border-radius: 6px;
   background-color: #f8f9fa;
-  transition: background-color 0.2s;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  transition: transform 0.2s;
 }
 
 .projectItem:hover {
-  background-color: #e8f5e9;
-}
-
-.projectItem strong {
-  display: block;
-  color: #333;
-  margin-bottom: 4px;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
 .projectDate {
   font-size: 12px;
-  color: #888;
-  margin-top: 4px;
+  color: #999;
+  margin-top: 5px;
 }
 
 .statItem {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 10px 0;
   border-bottom: 1px solid #eee;
 }
@@ -646,65 +640,44 @@
 }
 
 .statLabel {
-  color: #555;
+  color: #666;
   font-weight: 500;
 }
 
 .statValue {
   font-weight: bold;
   color: #2e8b57;
+  font-size: 18px;
 }
 
 .leaderboardHeader {
-  background-color: #2e8b57;
-  color: white;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-weight: bold;
-  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
   margin-bottom: 10px;
-  text-align: center;
-}
-
-.leaderboardScroll {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.leaderboardItemLink {
-  text-decoration: none;
-  color: inherit;
-  display: block;
-  margin-bottom: 8px;
+  font-size: 12px;
+  color: #999;
+  font-weight: bold;
 }
 
 .leaderboardItem {
   display: flex;
   align-items: center;
-  padding: 8px;
-  border-radius: 6px;
-  background-color: #fff;
-  border: 1px solid #eee;
-  transition: transform 0.2s;
+  padding: 10px;
+  background-color: white;
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.2s, transform 0.2s;
 }
 
 .leaderboardItem:hover {
+  background-color: #f9f9f9;
   transform: translateX(5px);
-  border-color: #2e8b57;
+  cursor: pointer;
 }
 
 .leaderboardRank {
   width: 30px;
-  height: 30px;
-  background-color: #2e8b57;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-weight: bold;
-  font-size: 14px;
-  margin-right: 10px;
+  color: #82AA52;
 }
 
 .leaderboardInfo {
@@ -715,10 +688,75 @@
   display: block;
   font-weight: 600;
   color: #333;
-  font-size: 14px;
 }
 
 .leaderPoints {
   font-size: 12px;
   color: #666;
+}
+
+/* Recycled Ideas Styles */
+.ideaCard {
+  background-color: white;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border: 1px solid #e8e8e8;
+}
+
+.ideaHeader {
+  margin-bottom: 15px;
+}
+
+.ideaHeader h3 {
+  margin: 0 0 5px 0;
+  color: #333;
+}
+
+.ideaMeta {
+  font-size: 13px;
+  color: #666;
+}
+
+.author {
+  font-weight: 600;
+  margin-right: 10px;
+  color: #2e8b57;
+}
+
+.ideaImageContainer {
+  width: 100%;
+  height: 200px;
+  background-color: #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.ideaDescription {
+  color: #444;
+  line-height: 1.5;
+  margin-bottom: 15px;
+}
+
+.ideaActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.actionBtn {
+  padding: 8px 16px;
+  background-color: #2e8b57;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.comments {
+  color: #666;
+  font-size: 14px;
 }

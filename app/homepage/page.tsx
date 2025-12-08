@@ -13,6 +13,70 @@ export default function Homepage() {
   const [activeTab, setActiveTab] = useState('donations');
   const [openComments, setOpenComments] = useState<Record<number, boolean>>({});
 
+  // Popup state
+  const [showDonationPopup, setShowDonationPopup] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    wasteType: '',
+    otherWaste: '',
+    subcategory: '',
+    quantity: '',
+    description: '',
+    photos: [] as File[]
+  });
+
+  const subcategories: Record<string, string[]> = {
+    Plastic: ["Plastic Bottles", "Plastic Containers", "Plastic Bags", "Wrappers"],
+    Paper: ["Newspapers", "Cardboard", "Magazines", "Office Paper"],
+    Glass: ["Glass Bottles", "Glass Jars", "Broken Glassware"],
+    Metal: ["Aluminum Cans", "Tin Cans", "Scrap Metal"],
+    Electronic: ["Old Phones", "Chargers", "Batteries", "Broken Gadgets"]
+  };
+
+  const handleDonateClick = () => {
+    setShowDonationPopup(true);
+  };
+
+  const handleClosePopup = () => {
+    setShowDonationPopup(false);
+    setShowSuccessPopup(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFormData(prev => ({
+        ...prev,
+        photos: Array.from(e.target.files || [])
+      }));
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Simulate submission
+    setShowDonationPopup(false);
+    setShowSuccessPopup(true);
+    // Reset form
+    setFormData({
+      wasteType: '',
+      otherWaste: '',
+      subcategory: '',
+      quantity: '',
+      description: '',
+      photos: []
+    });
+  };
+
   const toggleComments = (id: number) => {
     setOpenComments(prev => ({
       ...prev,
@@ -111,7 +175,7 @@ export default function Homepage() {
           <div className={styles.divider}></div>
           <p>Join our community in making the world a cleaner place</p>
           <div className={styles.btnContainer}>
-            <button type="button" className={styles.btn}>Donate Waste</button>
+            <button type="button" className={styles.btn} onClick={handleDonateClick}>Donate Waste</button>
             <Link href="/start-project" className={styles.btn}>Start Recycling</Link>
             <Link href="/learn_more" className={styles.btn} style={{ backgroundColor: '#666' }}>Learn More</Link>
           </div>
@@ -284,6 +348,89 @@ export default function Homepage() {
           </div>
       </div>
     </div>
+    {/* Popups */}
+    {showDonationPopup && (
+      <div className={styles.popupContainer} onClick={(e) => {
+        if (e.target === e.currentTarget) handleClosePopup();
+      }}>
+        <div className={styles.popupContent}>
+          <button className={styles.closeBtn} onClick={handleClosePopup}>×</button>
+          <h2>Post Donation</h2>
+          <div className={styles.popupScrollArea}>
+            <form onSubmit={handleSubmit}>
+              <div className={styles.formGroup}>
+                <label htmlFor="wasteType">Type of Waste:</label>
+                <select id="wasteType" name="wasteType" required value={formData.wasteType} onChange={handleInputChange}>
+                  <option value="">Select waste type</option>
+                  <option value="Plastic">Plastic</option>
+                  <option value="Paper">Paper</option>
+                  <option value="Metal">Metal</option>
+                  <option value="Glass">Glass</option>
+                  <option value="Electronic">Electronic</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {formData.wasteType === 'Other' && (
+                <div className={styles.formGroup}>
+                  <label htmlFor="otherWaste">Please specify:</label>
+                  <input type="text" id="otherWaste" name="otherWaste" placeholder="Type custom waste category..." required value={formData.otherWaste} onChange={handleInputChange} />
+                </div>
+              )}
+
+              {subcategories[formData.wasteType] && (
+                <div className={styles.formGroup}>
+                  <label htmlFor="subcategory">Subcategory:</label>
+                  <select id="subcategory" name="subcategory" required value={formData.subcategory} onChange={handleInputChange}>
+                    <option value="">-- Select Subcategory --</option>
+                    {subcategories[formData.wasteType].map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className={styles.formGroup}>
+                <label htmlFor="quantity">Quantity:</label>
+                <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" min="1" required value={formData.quantity} onChange={handleInputChange} />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="description">Description:</label>
+                <textarea id="description" name="description" placeholder="Describe your donation..." rows={4} required value={formData.description} onChange={handleInputChange}></textarea>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="photos">Attach Photos (up to 4):</label>
+                <div className={styles.fileUpload}>
+                  <input type="file" id="photos" name="photos" accept="image/*" multiple onChange={handleFileChange} />
+                  <label htmlFor="photos" className={styles.fileUploadLabel}>Choose Files</label>
+                  <span id="file-chosen">{formData.photos.length > 0 ? `${formData.photos.length} files selected` : 'No files chosen'}</span>
+                </div>
+                <small className={styles.formHint}>You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
+              </div>
+
+              <button type="submit" className={styles.submitBtn}>Post Donation</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {showSuccessPopup && (
+      <div className={styles.popupContainer}>
+        <div className={`${styles.popupContent} ${styles.successPopup}`}>
+          <div className={styles.successIcon}>
+            <i className="fas fa-gift"></i>
+          </div>
+          <h2>Congratulations!</h2>
+          <p>You’ve successfully donated your waste materials! 🎉<br />
+            Please wait for others to claim your donation.
+          </p>
+          <button className={styles.continueBtn} onClick={handleClosePopup}>Continue</button>
+        </div>
+      </div>
+    )}
     </ProtectedRoute>
   );
 }
