@@ -1,15 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './leaderboard.module.css';
+import { db } from '../../lib/firebase';
+import { ref, onValue } from 'firebase/database';
+
+interface LeaderboardUser {
+  id: string;
+  rank: number;
+  name: string;
+  points: number;
+  avatar: string;
+}
 
 export default function Leaderboard() {
   const { user } = useAuth();
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardUser[]>([]);
+  const [loading, setLoading] = useState(true);
   
   // Feedback state
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -19,6 +31,103 @@ export default function Leaderboard() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [ratingError, setRatingError] = useState(false);
   const [textError, setTextError] = useState(false);
+
+  useEffect(() => {
+    // Fetch Users, Donations, and Projects to calculate points
+    const usersRef = ref(db, 'users');
+    const donationsRef = ref(db, 'donations');
+    const projectsRef = ref(db, 'projects');
+
+    let usersData: any = {};
+    let donationsData: any = {};
+    let projectsData: any = {};
+    const dataLoaded = { users: false, donations: false, projects: false };
+
+    const calculateLeaderboard = (users: any, donations: any, projects: any) => {
+      const userPoints: Record<string, number> = {};
+  
+      // Initialize users with 0 points
+      Object.keys(users).forEach(userId => {
+        userPoints[userId] = 0;
+      });
+  
+      // Calculate points from Donations (e.g., 10 points per donation)
+      Object.values(donations).forEach((donation: any) => {
+        if (donation.userId && userPoints[donation.userId] !== undefined) {
+          userPoints[donation.userId] += 10;
+        }
+      });
+  
+      // Calculate points from Completed Projects (e.g., 20 points per completed project)
+      Object.values(projects).forEach((project: any) => {
+        if (project.authorId && project.status === 'completed' && userPoints[project.authorId] !== undefined) {
+          userPoints[project.authorId] += 20;
+        }
+      });
+  
+      // Convert to array and sort
+      const rankedUsers = Object.entries(userPoints)
+        .map(([userId, points]) => {
+          const userInfo = users[userId];
+          const fullName = userInfo.fullName || 'Unknown User';
+          return {
+            id: userId,
+            name: fullName,
+            points: points,
+            avatar: fullName.charAt(0).toUpperCase()
+          };
+        })
+        .filter(user => user.points > 0) // Exclude users with 0 points
+        .sort((a, b) => b.points - a.points) // Sort descending
+        .slice(0, 10) // Top 10
+        .map((user, index) => ({
+          ...user,
+          rank: index + 1
+        }));
+  
+      setLeaderboardData(rankedUsers);
+    };
+
+    const checkAndCalculate = () => {
+      if (dataLoaded.users && dataLoaded.donations && dataLoaded.projects) {
+        calculateLeaderboard(usersData, donationsData, projectsData);
+        setLoading(false);
+      }
+    };
+
+    const unsubscribeUsers = onValue(usersRef, (snapshot) => {
+      usersData = snapshot.val() || {};
+      dataLoaded.users = true;
+      checkAndCalculate();
+    }, (error) => {
+      console.error("Error fetching users:", error);
+      setLoading(false); // Stop loading on error
+    });
+
+    const unsubscribeDonations = onValue(donationsRef, (snapshot) => {
+      donationsData = snapshot.val() || {};
+      dataLoaded.donations = true;
+      checkAndCalculate();
+    }, (error) => {
+      console.error("Error fetching donations:", error);
+      setLoading(false);
+    });
+
+    const unsubscribeProjects = onValue(projectsRef, (snapshot) => {
+      projectsData = snapshot.val() || {};
+      dataLoaded.projects = true;
+      checkAndCalculate();
+    }, (error) => {
+      console.error("Error fetching projects:", error);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribeUsers();
+      unsubscribeDonations();
+      unsubscribeProjects();
+    };
+  }, []);
 
   const handleFeedbackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,14 +166,8 @@ export default function Leaderboard() {
     }, 1500);
   };
 
-  const leaderboardData = [
-    { id: 4, rank: 1, name: 'Hanner', points: 810, avatar: 'H' },
-    { id: 8, rank: 2, name: 'Princess Kenshi', points: 40, avatar: 'P' },
-    { id: 18, rank: 3, name: 'Princess', points: 40, avatar: 'P' },
-    { id: 12, rank: 4, name: 'Haruka', points: 20, avatar: 'H' },
-    { id: 19, rank: 5, name: 'Shem John', points: 20, avatar: 'S' },
-    { id: 21, rank: 6, name: 'Lucas', points: 20, avatar: 'L' },
-  ];
+  /* Removed static leaderboardData */
+
 
   const getRankClass = (rank: number) => {
     if (rank === 1) return styles.rankFirst;
@@ -109,6 +212,9 @@ export default function Leaderboard() {
             <h2 className={styles.leaderboardTitle}>Community Leaderboard</h2>
             <p className={styles.leaderboardSubtitle}>Top contributors making a difference for our planet</p>
             
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Loading leaderboard...</div>
+            ) : (
             <table className={styles.leaderboardTable}>
                 <thead>
                     <tr>
@@ -118,33 +224,40 @@ export default function Leaderboard() {
                     </tr>
                 </thead>
                 <tbody>
-                    {leaderboardData.map((user) => (
-                        <tr key={user.id} className={getRankClass(user.rank)}>
-                            <td className={styles.rank}>
-                                <div className={styles.rankContainer}>
-                                    {renderRankBadge(user.rank)}
-                                </div>
-                            </td>
-                            <td className={styles.userInfo}>
-                                <div className={styles.userLinkWrapper}>
-                                    <Link href={`/profile/${user.id}`} className={styles.userLink}>
-                                        <div className={styles.tableProfilePic}>
-                                            {user.avatar}
-                                        </div>
-                                        <span className={styles.userName}>{user.name}</span>
-                                    </Link>
-                                </div>
-                            </td>
-                            <td className={styles.points}>
-                                <div className={styles.pointsContainer}>
-                                    <span className={styles.pointsValue}>{user.points}</span>
-                                    <span className={styles.pointsLabel}>pts</span>
-                                </div>
-                            </td>
+                    {leaderboardData.length > 0 ? (
+                        leaderboardData.map((user) => (
+                            <tr key={user.id} className={getRankClass(user.rank)}>
+                                <td className={styles.rank}>
+                                    <div className={styles.rankContainer}>
+                                        {renderRankBadge(user.rank)}
+                                    </div>
+                                </td>
+                                <td className={styles.userInfo}>
+                                    <div className={styles.userLinkWrapper}>
+                                        <Link href={`/profile/${user.id}`} className={styles.userLink}>
+                                            <div className={styles.tableProfilePic}>
+                                                {user.avatar}
+                                            </div>
+                                            <span className={styles.userName}>{user.name}</span>
+                                        </Link>
+                                    </div>
+                                </td>
+                                <td className={styles.points}>
+                                    <div className={styles.pointsContainer}>
+                                        <span className={styles.pointsValue}>{user.points}</span>
+                                        <span className={styles.pointsLabel}>pts</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan={3} style={{ textAlign: 'center', padding: '20px' }}>No contributors yet. Be the first!</td>
                         </tr>
-                    ))}
+                    )}
                 </tbody>
             </table>
+            )}
         </div>
       </main>
 

@@ -329,15 +329,15 @@ function BrowseContent() {
             </form>
         </div>
 
-        <div className={styles['tab-container']}>
+        <div className={styles.tabContainer}>
             <button 
-                className={`${styles['tab-btn']} ${activeTab === 'donations' ? styles.active : ''}`}
+                className={`${styles.tabBtn} ${activeTab === 'donations' ? styles.active : ''}`}
                 onClick={() => setActiveTab('donations')}
             >
                 Donations
             </button>
             <button 
-                className={`${styles['tab-btn']} ${activeTab === 'recycled-ideas' ? styles.active : ''}`}
+                className={`${styles.tabBtn} ${activeTab === 'recycled-ideas' ? styles.active : ''}`}
                 onClick={() => setActiveTab('recycled-ideas')}
             >
                 Recycled Ideas
@@ -348,15 +348,14 @@ function BrowseContent() {
         {activeTab === 'donations' && (
             <div id="donations" style={{display: 'block'}}>
                 <div className={styles.categories}>
-                    <div className={styles['category-scroll-container']}>
-                        <ul className={styles['category-list']}>
+                    <div className={styles.categoryScrollContainer}>
+                        <ul className={styles.categoryList}>
                             {categories.map(cat => (
                                 <li key={cat} className={activeCategory === cat ? styles.active : ''}>
                                     <button 
                                         onClick={() => setActiveCategory(cat)}
-                                        style={{background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block', width: '100%'}}
                                     >
-                                        <a style={{pointerEvents: 'none'}}>{cat}</a>
+                                        {cat}
                                     </button>
                                 </li>
                             ))}

@@ -188,6 +188,10 @@
   cursor: pointer;
 }
 
+.active {
+  /* Marker class for active state */
+}
+
 .tabContainer {
   display: flex;
   gap: 10px;
@@ -219,18 +223,18 @@
 .categories {
   margin-bottom: 20px;
 }
-.category-scroll-container {
+.categoryScrollContainer {
   overflow-x: auto;
   padding-bottom: 10px;
 }
-.category-list {
+.categoryList {
   display: flex;
   gap: 10px;
   list-style: none;
   padding: 0;
   margin: 0;
 }
-.category-list li button {
+.categoryList li button {
   padding: 8px 16px;
   border-radius: 20px;
   border: 1px solid #ddd;
@@ -240,7 +244,7 @@
   color: #333;
   font-size: 14px;
 }
-.category-list li.active button {
+.categoryList li.active button {
   background-color: #2e8b57;
   color: white;
   border-color: #2e8b57;

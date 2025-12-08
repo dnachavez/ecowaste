@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
@@ -51,6 +51,7 @@ interface FirebaseProject {
   id: string;
   title: string;
   description: string;
+  authorId?: string;
   authorName: string;
   createdAt: string;
   final_images?: string[];
@@ -59,6 +60,12 @@ interface FirebaseProject {
   materials?: ProjectMaterial[];
   workflow_stage?: number;
   steps?: Step[];
+}
+
+interface FirebaseUser {
+    fullName: string;
+    email: string;
+    avatar?: string;
 }
 
 export default function Homepage() {
@@ -97,6 +104,13 @@ export default function Homepage() {
   });
 
   const [donations, setDonations] = useState<Donation[]>([]);
+  const [userProjects, setUserProjects] = useState<{id: string, title: string, description: string, date: string}[]>([]);
+  const [quickStats, setQuickStats] = useState({ recycled: 0, donated: 0 });
+  
+  // Raw data for leaderboard calculation
+  const [rawUsers, setRawUsers] = useState<Record<string, FirebaseUser>>({});
+  const [rawDonations, setRawDonations] = useState<Record<string, FirebaseDonation>>({});
+  const [rawProjects, setRawProjects] = useState<Record<string, FirebaseProject>>({});
 
   const subcategories: Record<string, string[]> = {
     Plastic: ["Plastic Bottles", "Plastic Containers", "Plastic Bags", "Wrappers"],
@@ -127,8 +141,16 @@ export default function Homepage() {
   useEffect(() => {
     const donationsRef = ref(db, 'donations');
     const unsubscribe = onValue(donationsRef, (snapshot) => {
-      const data = snapshot.val();
+      const data = snapshot.val() as Record<string, FirebaseDonation> | null;
+      setRawDonations(data || {});
+      
       if (data) {
+        // Calculate Quick Stats (Donated)
+        if (user) {
+            const userDonationsCount = Object.values(data).filter((d) => d.userId === user.uid).length;
+            setQuickStats(prev => ({ ...prev, donated: userDonationsCount }));
+        }
+
         const loadedDonations = Object.entries(data).map(([key, value]) => {
             const donation = value as FirebaseDonation;
             return {
@@ -164,11 +186,12 @@ export default function Homepage() {
         setDonations(loadedDonations);
       } else {
         setDonations([]);
+        if (user) setQuickStats(prev => ({ ...prev, donated: 0 }));
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const handleTryIdeaClick = (idea: RecycledIdea) => {
     setSelectedIdea(idea);
@@ -390,56 +413,124 @@ export default function Homepage() {
   useEffect(() => {
     const projectsRef = ref(db, 'projects');
     const unsubscribe = onValue(projectsRef, (snapshot) => {
-      const data = snapshot.val();
+      const data = snapshot.val() as Record<string, FirebaseProject> | null;
+      setRawProjects(data || {});
+
       if (data) {
-        const loadedProjects = Object.entries(data)
-            .map(([key, value]) => {
-                const project = value as FirebaseProject;
-                return {
-                    ...project,
-                    id: key
-                };
-            })
+        const allProjects = Object.entries(data).map(([key, value]) => {
+            const project = value as FirebaseProject;
+            return {
+                ...project,
+                id: key
+            };
+        });
+
+        // 1. Recycled Ideas (Public)
+        const loadedProjects = allProjects
             .filter(project => project.visibility === 'public' && project.final_images && project.final_images.length > 0)
             .map(project => ({
                 id: project.id,
                 title: project.title,
                 author: project.authorName || 'Anonymous',
-                timeAgo: project.createdAt, // We might want to calculate real time ago if createdAt is ISO string
+                timeAgo: project.createdAt, 
                 image: project.final_images ? project.final_images[0] : '',
                 description: project.description,
-                commentsCount: 0, // Placeholder
+                commentsCount: 0, 
                 materials: project.materials ? (Array.isArray(project.materials) ? project.materials : Object.values(project.materials)) as ProjectMaterial[] : [],
                 workflow_stage: project.workflow_stage,
                 steps: project.steps ? (Array.isArray(project.steps) ? project.steps : Object.values(project.steps)) as Step[] : []
             }));
         
         setRecycledIdeas(loadedProjects);
+
+        // 2. User Projects & Quick Stats
+        if (user) {
+            const myProjects = allProjects.filter(p => p.authorId === user.uid);
+            
+            setUserProjects(myProjects.map(p => ({
+                id: p.id,
+                title: p.title,
+                description: p.description,
+                date: p.createdAt
+            })));
+
+            // Count completed projects for stats
+            const completedCount = myProjects.filter(p => p.status === 'completed').length;
+            // If status is not strictly 'completed', we might want to count all 'active' ones too?
+            // The previous mock was '0'. Let's stick to 'completed' as it implies 'Recycled'. 
+            // If the user just started a project, it's not recycled yet.
+            setQuickStats(prev => ({ ...prev, recycled: completedCount }));
+        }
+
       } else {
         setRecycledIdeas([]);
+        if (user) {
+            setUserProjects([]);
+            setQuickStats(prev => ({ ...prev, recycled: 0 }));
+        }
       }
     });
 
     return () => unsubscribe();
+  }, [user]);
+
+  // Fetch Users for Leaderboard
+  useEffect(() => {
+    const usersRef = ref(db, 'users');
+    const unsubscribe = onValue(usersRef, (snapshot) => {
+        setRawUsers(snapshot.val() as Record<string, FirebaseUser> || {});
+    });
+    return () => unsubscribe();
   }, []);
 
-  const projects = [
-      {
-          id: 25,
-          title: 'Plastic Bottle Vase',
-          description: 'Vase made out of plastic bottles',
-          date: 'Dec 07, 2025'
-      }
-  ];
+  // Calculate Leaderboard
+  const leaderboardData = useMemo(() => {
+      if (Object.keys(rawUsers).length === 0 && Object.keys(rawDonations).length === 0 && Object.keys(rawProjects).length === 0) return [];
 
-  const leaderboard = [
-      { id: 4, rank: 1, name: 'Hanner', points: '810 pts' },
-      { id: 8, rank: 2, name: 'Princess Kenshi', points: '40 pts' },
-      { id: 18, rank: 3, name: 'Princess', points: '40 pts' },
-      { id: 12, rank: 4, name: 'Haruka', points: '20 pts' },
-      { id: 19, rank: 5, name: 'Shem John', points: '20 pts' },
-      { id: 21, rank: 6, name: 'Lucas', points: '20 pts' },
-  ];
+      const userPoints: Record<string, number> = {};
+
+      // Initialize users with 0 points
+      Object.keys(rawUsers).forEach(userId => {
+        userPoints[userId] = 0;
+      });
+
+      // Calculate points from Donations (10 pts)
+      Object.values(rawDonations).forEach((donation) => {
+        if (donation.userId && userPoints[donation.userId] !== undefined) {
+          userPoints[donation.userId] += 10;
+        } else if (donation.userId) {
+            // In case user is not in users list (shouldn't happen but safe to add)
+            userPoints[donation.userId] = (userPoints[donation.userId] || 0) + 10;
+        }
+      });
+
+      // Calculate points from Completed Projects (20 pts)
+      Object.values(rawProjects).forEach((project) => {
+        if (project.authorId && project.status === 'completed') {
+            userPoints[project.authorId] = (userPoints[project.authorId] || 0) + 20;
+        }
+      });
+
+      // Convert to array and sort
+      return Object.entries(userPoints)
+        .map(([userId, points]) => {
+          const userInfo = rawUsers[userId] || {};
+          const fullName = userInfo.fullName || 'Unknown User'; // Check property name in users node
+          return {
+            id: userId,
+            name: fullName,
+            points: points,
+            avatar: fullName.charAt(0).toUpperCase()
+          };
+        })
+        .filter(user => user.points > 0)
+        .sort((a, b) => b.points - a.points)
+        .slice(0, 5) // Top 5 for sidebar
+        .map((user, index) => ({
+          ...user,
+          rank: index + 1
+        }));
+  }, [rawUsers, rawDonations, rawProjects]);
 
   return (
     <ProtectedRoute>
@@ -615,7 +706,12 @@ export default function Homepage() {
               <h2>Your Projects</h2>
               <div className={styles.divider}></div>
               <div className={styles.projectsScroll}>
-                  {projects.map(project => (
+                  {userProjects.length === 0 && (
+                      <div style={{padding:'10px', color:'#888', textAlign:'center'}}>
+                          No projects yet.
+                      </div>
+                  )}
+                  {userProjects.map(project => (
                       <Link key={project.id} href={`/project_details/${project.id}`} className={styles.projectItemLink}>
                           <div className={styles.projectItem}>
                               <strong>{project.title}</strong>
@@ -632,11 +728,11 @@ export default function Homepage() {
               <div className={styles.divider}></div>
               <div className={styles.statItem}>
                   <div className={styles.statLabel}>Items Recycled</div>
-                  <div className={styles.statValue}>0</div>
+                  <div className={styles.statValue}>{quickStats.recycled}</div>
               </div>
               <div className={styles.statItem}>
                   <div className={styles.statLabel}>Items Donated</div>
-                  <div className={styles.statValue}>0</div>
+                  <div className={styles.statValue}>{quickStats.donated}</div>
               </div>
           </div>
 
@@ -644,17 +740,22 @@ export default function Homepage() {
               <h3>Leaderboard</h3>
               <div className={styles.divider}></div>
               <div className={styles.leaderboardHeader}>
-                  <span>TOP 10 USERS</span>
+                  <span>TOP 5 USERS</span>
               </div>
 
               <div className={styles.leaderboardScroll}>
-                  {leaderboard.map(user => (
+                  {leaderboardData.length === 0 && (
+                      <div style={{padding:'10px', color:'#888', textAlign:'center'}}>
+                          Loading...
+                      </div>
+                  )}
+                  {leaderboardData.map(user => (
                       <Link key={user.id} href={`/profile/${user.id}`} className={styles.leaderboardItemLink}>
                           <div className={styles.leaderboardItem}>
                               <div className={styles.leaderboardRank}>#{user.rank}</div>
                               <div className={styles.leaderboardInfo}>
                                   <strong className={styles.leaderName}>{user.name}</strong>
-                                  <div className={styles.leaderPoints}>{user.points}</div>
+                                  <div className={styles.leaderPoints}>{user.points} pts</div>
                               </div>
                           </div>
                       </Link>
@@ -810,7 +911,7 @@ export default function Homepage() {
                 <label htmlFor="projectId">Recycling Project:</label>
                 <select id="projectId" name="projectId" required value={requestFormData.projectId} onChange={handleRequestInputChange}>
                   <option value="">Select a project</option>
-                  {projects.map(p => (
+                  {userProjects.map(p => (
                       <option key={p.id} value={p.id}>{p.title}</option>
                   ))}
                 </select>
