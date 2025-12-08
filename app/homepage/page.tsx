@@ -41,13 +41,14 @@ interface FirebaseDonation {
   description: string;
   images: string[];
   createdAt: string;
-  comments: Comment[];
+  comments?: Record<string, Omit<Comment, 'id'>>;
 }
 
 export default function Homepage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('donations');
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
 
   // Popup state
   const [showDonationPopup, setShowDonationPopup] = useState(false);
@@ -122,7 +123,12 @@ export default function Homepage() {
                 unit: donation.unit || 'Units',
                 description: donation.description,
                 images: donation.images || [],
-                comments: donation.comments || []
+                comments: donation.comments 
+                  ? Object.entries(donation.comments).map(([cid, c]) => ({
+                      id: cid,
+                      ...c
+                    }))
+                  : []
             };
         });
         // Sort by date desc
@@ -296,6 +302,41 @@ export default function Homepage() {
     }
   };
 
+  const handleCommentInputChange = (donationId: string, value: string) => {
+    setCommentInputs(prev => ({
+      ...prev,
+      [donationId]: value
+    }));
+  };
+
+  const handlePostComment = async (donationId: string) => {
+    if (!user) {
+        alert("Please login to comment.");
+        return;
+    }
+    if (!commentInputs[donationId]?.trim()) return;
+
+    const commentData = {
+      author: user.displayName || 'Anonymous',
+      text: commentInputs[donationId],
+      time: new Date().toISOString()
+    };
+
+    try {
+      const commentsRef = ref(db, `donations/${donationId}/comments`);
+      await push(commentsRef, commentData);
+      
+      // Clear input
+      setCommentInputs(prev => ({
+        ...prev,
+        [donationId]: ''
+      }));
+    } catch (error) {
+      console.error("Error posting comment: ", error);
+      alert("Failed to post comment.");
+    }
+  };
+
   const toggleComments = (id: string) => {
     setOpenComments(prev => ({
       ...prev,
@@ -444,11 +485,31 @@ export default function Homepage() {
                     {openComments[donation.id] && (
                       <div className={styles.commentsSection}>
                         <div className={styles.commentsList}>
-                          <div className={styles.noComments}>No comments yet. Be the first to comment!</div>
+                          {donation.comments && donation.comments.length > 0 ? (
+                            donation.comments.map(comment => (
+                              <div key={comment.id} className={styles.commentItem} style={{marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid #eee'}}>
+                                <div style={{fontWeight: 'bold', fontSize: '14px'}}>{comment.author} <span style={{fontSize: '12px', color: '#888', fontWeight: 'normal'}}>{calculateTimeAgo(comment.time)}</span></div>
+                                <div style={{fontSize: '14px', marginTop: '4px'}}>{comment.text}</div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className={styles.noComments}>No comments yet. Be the first to comment!</div>
+                          )}
                         </div>
                         <div className={styles.addComment}>
-                          <textarea className={styles.commentTextarea} placeholder="Add a comment..."></textarea>
-                          <button type="button" className={styles.postCommentBtn}>Post Comment</button>
+                          <textarea 
+                              className={styles.commentTextarea} 
+                              placeholder="Add a comment..."
+                              value={commentInputs[donation.id] || ''}
+                              onChange={(e) => handleCommentInputChange(donation.id, e.target.value)}
+                          ></textarea>
+                          <button 
+                              type="button" 
+                              className={styles.postCommentBtn}
+                              onClick={() => handlePostComment(donation.id)}
+                          >
+                              Post Comment
+                          </button>
                         </div>
                       </div>
                     )}

@@ -12,7 +12,7 @@ import { ref, onValue, push, set } from 'firebase/database';
 import { useAuth } from '../../context/AuthContext';
 
 interface Comment {
-  id: number;
+  id: string;
   author: string;
   text: string;
   time: string;
@@ -42,7 +42,7 @@ interface FirebaseDonation {
   description: string;
   images: string[];
   createdAt: string;
-  comments: Comment[];
+  comments?: Record<string, Omit<Comment, 'id'>>;
 }
 
 export default function Browse() {
@@ -53,6 +53,7 @@ export default function Browse() {
   const [activeTab, setActiveTab] = useState('donations');
   const [activeCategory, setActiveCategory] = useState(categoryParam || 'All');
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [showRequestPopup, setShowRequestPopup] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null);
   const [requestQuantity, setRequestQuantity] = useState(1);
@@ -98,7 +99,12 @@ export default function Browse() {
                 unit: donation.unit || 'Units',
                 description: donation.description,
                 images: donation.images || [],
-                comments: donation.comments || []
+                comments: donation.comments 
+                  ? Object.entries(donation.comments).map(([cid, c]) => ({
+                      id: cid, // This might need to be number if Comment.id is number, let's check
+                      ...c
+                    }))
+                  : []
             };
         });
         // Sort by date desc
@@ -120,6 +126,41 @@ export default function Browse() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryParam]);
+
+  const handleCommentInputChange = (donationId: string, value: string) => {
+    setCommentInputs(prev => ({
+      ...prev,
+      [donationId]: value
+    }));
+  };
+
+  const handlePostComment = async (donationId: string) => {
+    if (!user) {
+        alert("Please login to comment.");
+        return;
+    }
+    if (!commentInputs[donationId]?.trim()) return;
+
+    const commentData = {
+      author: user.displayName || 'Anonymous',
+      text: commentInputs[donationId],
+      time: new Date().toISOString()
+    };
+
+    try {
+      const commentsRef = ref(db, `donations/${donationId}/comments`);
+      await push(commentsRef, commentData);
+      
+      // Clear input
+      setCommentInputs(prev => ({
+        ...prev,
+        [donationId]: ''
+      }));
+    } catch (error) {
+      console.error("Error posting comment: ", error);
+      alert("Failed to post comment.");
+    }
+  };
 
   const toggleComments = (id: string) => {
     setOpenComments(prev => ({
@@ -318,19 +359,31 @@ export default function Browse() {
                                 {openComments[donation.id] && (
                                     <div className={styles.commentsSection}>
                                         <div className={styles.commentsList}>
-                                            {donation.comments.length === 0 ? (
-                                                <div className={styles.noComments}>No comments yet. Be the first to comment!</div>
-                                            ) : (
+                                            {donation.comments && donation.comments.length > 0 ? (
                                                 donation.comments.map(comment => (
-                                                    <div key={comment.id} className={styles.comment}>
-                                                        <strong>{comment.author}</strong>: {comment.text} <span style={{fontSize: '0.8em', color: '#999'}}>({comment.time})</span>
+                                                    <div key={comment.id} className={styles.comment} style={{marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid #eee'}}>
+                                                        <div style={{fontWeight: 'bold', fontSize: '14px'}}>{comment.author} <span style={{fontSize: '12px', color: '#888', fontWeight: 'normal'}}>{calculateTimeAgo(comment.time)}</span></div>
+                                                        <div style={{fontSize: '14px', marginTop: '4px'}}>{comment.text}</div>
                                                     </div>
                                                 ))
+                                            ) : (
+                                                <div className={styles.noComments}>No comments yet. Be the first to comment!</div>
                                             )}
                                         </div>
                                         <div className={styles.addComment}>
-                                            <textarea className={styles.commentTextarea} placeholder="Add a comment..."></textarea>
-                                            <button type="button" className={styles.postCommentBtn}>Post Comment</button>
+                                            <textarea 
+                                                className={styles.commentTextarea} 
+                                                placeholder="Add a comment..."
+                                                value={commentInputs[donation.id] || ''}
+                                                onChange={(e) => handleCommentInputChange(donation.id, e.target.value)}
+                                            ></textarea>
+                                            <button 
+                                                type="button" 
+                                                className={styles.postCommentBtn}
+                                                onClick={() => handlePostComment(donation.id)}
+                                            >
+                                                Post Comment
+                                            </button>
                                         </div>
                                     </div>
                                 )}
