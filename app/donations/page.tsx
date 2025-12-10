@@ -6,7 +6,8 @@ import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './donations.module.css';
 import { db } from '../../lib/firebase';
-import { ref, query, orderByChild, equalTo, onValue, update, remove } from 'firebase/database';
+import { ref, query, orderByChild, equalTo, onValue, update, remove, runTransaction, get } from 'firebase/database';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 
 interface Donation {
@@ -37,15 +38,27 @@ interface Request {
   quantity: number;
   urgencyLevel?: string;
   projectId?: string;
+  projectTitle?: string;
+  deliveryStatus?: string;
+  estimatedDeliveryDate?: string;
+  estimatedPickupDate?: string;
+  processingDate?: string;
+  deliveredDate?: string;
+  cancelledDate?: string;
   createdAt: number;
 }
 
 export default function DonationsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('my-donations');
   const [myDonations, setMyDonations] = useState<Donation[]>([]);
   const [requestsForMe, setRequestsForMe] = useState<Request[]>([]);
   const [myRequests, setMyRequests] = useState<Request[]>([]);
+  
+  // Status Modal State
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedRequestForStatus, setSelectedRequestForStatus] = useState<Request | null>(null);
   
   // Load data
   useEffect(() => {
@@ -78,10 +91,21 @@ export default function DonationsPage() {
       const data = snapshot.val();
       if (data) {
         const loadedRequests = Object.entries(data).map(([key, value]) => {
-           return {
+           const req = {
              id: key,
              ...(value as Omit<Request, 'id'>)
            } as Request;
+
+           // Backfill Project Title if missing
+           if (req.projectId && !req.projectTitle) {
+               get(ref(db, `projects/${req.projectId}`)).then((snap) => {
+                   if (snap.exists()) {
+                       update(ref(db, `requests/${key}`), { projectTitle: snap.val().title });
+                   }
+               });
+           }
+
+           return req;
         });
         setRequestsForMe(loadedRequests.reverse());
       } else {
@@ -114,10 +138,38 @@ export default function DonationsPage() {
     };
   }, [user]);
 
-  const handleUpdateStatus = (requestId: string, newStatus: string) => {
-    const requestRef = ref(db, `requests/${requestId}`);
-    update(requestRef, { status: newStatus })
-      .catch((error) => console.error("Error updating status:", error));
+  const handleUpdateStatus = async (request: Request, newStatus: string) => {
+    if (newStatus === 'approved') {
+        const donationRef = ref(db, `donations/${request.donationId}`);
+        
+        try {
+            await runTransaction(donationRef, (currentDonation) => {
+                if (currentDonation) {
+                    const currentQty = parseFloat(currentDonation.quantity);
+                    if (!isNaN(currentQty)) {
+                         const newQty = currentQty - request.quantity;
+                         currentDonation.quantity = newQty.toString();
+                    }
+                }
+                return currentDonation;
+            });
+            
+             const requestRef = ref(db, `requests/${request.id}`);
+             await update(requestRef, { 
+                 status: newStatus,
+                 deliveryStatus: 'Pending Item',
+                 processingDate: new Date().toISOString()
+             });
+
+        } catch (error) {
+            console.error("Error updating donation quantity:", error);
+            alert("Failed to update donation quantity. Please try again.");
+        }
+    } else {
+        const requestRef = ref(db, `requests/${request.id}`);
+        update(requestRef, { status: newStatus })
+          .catch((error) => console.error("Error updating status:", error));
+    }
   };
 
   const handleDeleteRequest = (requestId: string) => {
@@ -125,6 +177,14 @@ export default function DonationsPage() {
         const requestRef = ref(db, `requests/${requestId}`);
         remove(requestRef)
             .catch((error) => console.error("Error deleting request:", error));
+    }
+  };
+
+  const handleDeleteDonation = (donationId: string) => {
+    if (confirm("Are you sure you want to delete this donation?")) {
+        const donationRef = ref(db, `donations/${donationId}`);
+        remove(donationRef)
+            .catch((error) => console.error("Error deleting donation:", error));
     }
   };
 
@@ -208,6 +268,22 @@ export default function DonationsPage() {
                                                 </div>
                                             </div>
                                         </div>
+                                        <div className={styles['row-actions']}>
+                                            <button 
+                                                className={styles['btn-view']}
+                                                style={{backgroundColor: '#2e8b57', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', marginRight: '8px'}}
+                                                onClick={() => router.push(`/homepage?donationId=${donation.id}`)}
+                                            >
+                                                View Details
+                                            </button>
+                                            <button 
+                                                className={styles['btn-delete']}
+                                                style={{backgroundColor: '#d32f2f', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer'}}
+                                                onClick={() => handleDeleteDonation(donation.id)}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -242,6 +318,12 @@ export default function DonationsPage() {
                                                     <i className="fas fa-user"></i>
                                                     <span>{request.requesterName}</span>
                                                 </div>
+                                                {request.projectTitle && (
+                                                    <div className={styles['meta-item']}>
+                                                        <i className="fas fa-project-diagram"></i>
+                                                        <span>Project: {request.projectTitle}</span>
+                                                    </div>
+                                                )}
                                                 <div className={styles['meta-item']}>
                                                     <i className="fas fa-cube"></i>
                                                     <span>Qty: {request.quantity}</span>
@@ -257,23 +339,44 @@ export default function DonationsPage() {
                                                     <span>{new Date(request.createdAt).toLocaleDateString()}</span>
                                                 </div>
                                             </div>
+                                            {(request.status === 'approved' || request.status === 'completed') && (
+                                                <div className={styles['delivery-info']} style={{marginTop: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>
+                                                    <div className={styles['info-item']} style={{marginBottom: '5px'}}>
+                                                        <strong>Delivery Status:</strong> {request.deliveryStatus || 'Pending'}
+                                                    </div>
+                                                    {request.estimatedDeliveryDate && (
+                                                        <div className={styles['info-item']}>
+                                                            <strong>Est. Delivery:</strong> {new Date(request.estimatedDeliveryDate).toLocaleDateString()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className={styles['row-actions']}>
                                             {request.status === 'pending' && (
                                                 <>
                                                     <button 
                                                         className={styles['btn-approve']}
-                                                        onClick={() => handleUpdateStatus(request.id, 'approved')}
+                                                        onClick={() => handleUpdateStatus(request, 'approved')}
                                                     >
                                                         Approve
                                                     </button>
                                                     <button 
                                                         className={styles['btn-reject']}
-                                                        onClick={() => handleUpdateStatus(request.id, 'rejected')}
+                                                        onClick={() => handleUpdateStatus(request, 'rejected')}
                                                     >
                                                         Reject
                                                     </button>
                                                 </>
+                                            )}
+                                            {(request.status === 'approved' || request.status === 'completed') && (
+                                                 <button
+                                                    className={styles['btn-view']}
+                                                    style={{backgroundColor: '#2196F3', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px'}}
+                                                    onClick={() => { setSelectedRequestForStatus(request); setShowStatusModal(true); }}
+                                                 >
+                                                    View Status
+                                                 </button>
                                             )}
                                             <button 
                                                 className={styles['btn-reject']} // Reusing reject style (usually red) or maybe create a delete style
@@ -384,6 +487,53 @@ export default function DonationsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Status Modal */}
+            {showStatusModal && selectedRequestForStatus && (
+                <div className={styles['modal-overlay']}>
+                    <div className={styles['modal-content']}>
+                        <div className={styles['modal-header']}>
+                            <h3>Delivery Status</h3>
+                            <button onClick={() => setShowStatusModal(false)} className={styles['close-btn']}>×</button>
+                        </div>
+                        <div className={styles['modal-body']}>
+                            <div className={styles['status-timeline']}>
+                                {['Pending Item', 'Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'].map((step, index) => {
+                                    const currentStatus = selectedRequestForStatus.deliveryStatus || 'Pending Item';
+                                    const statuses = ['Pending Item', 'Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered', 'Cancelled'];
+                                    const currentIndex = statuses.indexOf(currentStatus);
+                                    const stepIndex = statuses.indexOf(step);
+                                    const isCompleted = stepIndex <= currentIndex && currentStatus !== 'Cancelled';
+                                    
+                                    return (
+                                        <div key={step} className={`${styles['timeline-step']} ${isCompleted ? styles['completed'] : ''}`}>
+                                            <div className={styles['step-icon']}>
+                                                {isCompleted ? <i className="fas fa-check-circle"></i> : <i className="far fa-circle"></i>}
+                                            </div>
+                                            <div className={styles['step-info']}>
+                                                <h4>{step}</h4>
+                                                {step === 'Pending Item' && selectedRequestForStatus.processingDate && isCompleted && <span className={styles['step-date']}>{new Date(selectedRequestForStatus.processingDate).toLocaleDateString()}</span>}
+                                                {step === 'Ready for Pickup' && selectedRequestForStatus.estimatedPickupDate && <span className={styles['step-date']}>Est: {new Date(selectedRequestForStatus.estimatedPickupDate).toLocaleDateString()}</span>}
+                                                {step === 'Delivered' && selectedRequestForStatus.deliveredDate && <span className={styles['step-date']}>Delivered: {new Date(selectedRequestForStatus.deliveredDate).toLocaleDateString()}</span>}
+                                                {step === 'Delivered' && !selectedRequestForStatus.deliveredDate && selectedRequestForStatus.estimatedDeliveryDate && <span className={styles['step-date']}>Est: {new Date(selectedRequestForStatus.estimatedDeliveryDate).toLocaleDateString()}</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {selectedRequestForStatus.deliveryStatus === 'Cancelled' && (
+                                    <div className={`${styles['timeline-step']} ${styles['cancelled']}`}>
+                                        <div className={styles['step-icon']}><i className="fas fa-times-circle"></i></div>
+                                        <div className={styles['step-info']}>
+                                            <h4>Cancelled</h4>
+                                            {selectedRequestForStatus.cancelledDate && <span className={styles['step-date']}>{new Date(selectedRequestForStatus.cancelledDate).toLocaleDateString()}</span>}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
       </div>
     </ProtectedRoute>

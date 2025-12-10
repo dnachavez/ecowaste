@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
@@ -71,6 +71,8 @@ interface FirebaseUser {
 export default function Homepage() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const donationId = searchParams.get('donationId');
   const [activeTab, setActiveTab] = useState('donations');
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
@@ -272,6 +274,7 @@ export default function Homepage() {
             quantity: requestFormData.quantityClaim, // Using 'quantity' to match other pages
             quantityClaimed: requestFormData.quantityClaim, // Keeping for backward compat if needed
             projectId: requestFormData.projectId,
+            projectTitle: userProjects.find(p => p.id === requestFormData.projectId)?.title || '',
             urgencyLevel: requestFormData.urgencyLevel,
             status: 'pending',
             createdAt: Date.now() // Changed to Date.now() to match other pages which might use timestamp number
@@ -536,6 +539,33 @@ export default function Homepage() {
         }));
   }, [rawUsers, rawDonations, rawProjects]);
 
+  useEffect(() => {
+    if (donationId && donations.length > 0) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`donation-${donationId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Highlight effect
+          const originalTransition = element.style.transition;
+          const originalBorder = element.style.border;
+          
+          element.style.transition = 'all 0.5s ease';
+          element.style.border = '2px solid #2e8b57';
+          element.style.boxShadow = '0 0 10px rgba(46, 139, 87, 0.3)';
+          
+          setTimeout(() => {
+             element.style.border = originalBorder;
+             element.style.boxShadow = 'none';
+             setTimeout(() => {
+                element.style.transition = originalTransition;
+             }, 500);
+          }, 2000);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [donationId, donations]);
+
   return (
     <ProtectedRoute>
     <div className={styles.container}>
@@ -584,7 +614,7 @@ export default function Homepage() {
                     </div>
                 )}
                 {donations.map(donation => (
-                  <div key={donation.id} className={styles.donationPost}>
+                  <div key={donation.id} id={`donation-${donation.id}`} className={styles.donationPost}>
                     <div className={styles.donationUserHeader}>
                       <div className={styles.userAvatar}>
                         {donation.user.avatar && (donation.user.avatar.startsWith('http') || donation.user.avatar.startsWith('/')) ? (
