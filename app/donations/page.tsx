@@ -34,7 +34,8 @@ interface Request {
   requesterName: string;
   requesterAvatar: string;
   ownerId: string;
-  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  ownerName?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'completed' | 'cancelled';
   quantity: number;
   urgencyLevel?: string;
   projectId?: string;
@@ -60,6 +61,12 @@ export default function DonationsPage() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedRequestForStatus, setSelectedRequestForStatus] = useState<Request | null>(null);
   
+  // Edit Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedRequestForEdit, setSelectedRequestForEdit] = useState<Request | null>(null);
+  const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editUrgency, setEditUrgency] = useState<string>('Low');
+
   // Load data
   useEffect(() => {
     if (!user) return;
@@ -120,10 +127,21 @@ export default function DonationsPage() {
       const data = snapshot.val();
       if (data) {
         const loadedRequests = Object.entries(data).map(([key, value]) => {
-           return {
+           const req = {
              id: key,
              ...(value as Omit<Request, 'id'>)
            } as Request;
+
+           // Backfill Owner Name if missing
+           if (req.donationId && !req.ownerName) {
+               get(ref(db, `donations/${req.donationId}`)).then((snap) => {
+                   if (snap.exists()) {
+                       update(ref(db, `requests/${key}`), { ownerName: snap.val().userName });
+                   }
+               });
+           }
+
+           return req;
         });
         setMyRequests(loadedRequests.reverse());
       } else {
@@ -169,6 +187,76 @@ export default function DonationsPage() {
         const requestRef = ref(db, `requests/${request.id}`);
         update(requestRef, { status: newStatus })
           .catch((error) => console.error("Error updating status:", error));
+    }
+  };
+
+  const handleEditRequest = (request: Request) => {
+    setSelectedRequestForEdit(request);
+    setEditQuantity(request.quantity);
+    setEditUrgency(request.urgencyLevel || 'Low');
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedRequestForEdit) return;
+    
+    try {
+        const requestRef = ref(db, `requests/${selectedRequestForEdit.id}`);
+        await update(requestRef, {
+            quantity: editQuantity,
+            urgencyLevel: editUrgency
+        });
+        setShowEditModal(false);
+        setSelectedRequestForEdit(null);
+    } catch (error) {
+        console.error("Error updating request:", error);
+        alert("Failed to update request.");
+    }
+  };
+
+  const handleCancelRequest = async (request: Request) => {
+    // Check if status is "Ready for Pickup" or further
+    const nonCancellableStatuses = ['Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'];
+    if (request.deliveryStatus && nonCancellableStatuses.includes(request.deliveryStatus)) {
+        alert("Cannot cancel request. It is already being processed.");
+        return;
+    }
+
+    if (confirm("Are you sure you want to cancel this request?")) {
+         const requestRef = ref(db, `requests/${request.id}`);
+         
+         // If it was approved, restore donation quantity
+         if (request.status === 'approved') {
+              const donationRef = ref(db, `donations/${request.donationId}`);
+              
+              // We use runTransaction to safely increment
+              // Note: We don't await this strictly before updating status, but it's better to do so.
+              // However, runTransaction can fail if permissions issues etc. 
+              // Let's wrap in try-catch or just fire and forget with log.
+              try {
+                  await runTransaction(donationRef, (currentDonation) => {
+                      if (currentDonation) {
+                          const currentQty = parseFloat(currentDonation.quantity);
+                          if (!isNaN(currentQty)) {
+                               const newQty = currentQty + request.quantity;
+                               currentDonation.quantity = newQty.toString();
+                          }
+                      }
+                      return currentDonation;
+                  });
+              } catch (e) {
+                  console.error("Failed to restore quantity", e);
+              }
+         }
+
+         await update(requestRef, { 
+             status: 'cancelled',
+             deliveryStatus: 'Cancelled',
+             cancelledDate: new Date().toISOString()
+         });
+         
+         // If we are in the modal, close it
+         setShowStatusModal(false);
     }
   };
 
@@ -412,14 +500,26 @@ export default function DonationsPage() {
                                         />
                                         <div className={styles['row-content']}>
                                             <div className={styles['row-header']}>
-                                                <h3 className={styles['row-title']}>Request for: {request.donationTitle}</h3>
+                                                <h3 className={styles['row-title']}>{request.donationTitle}</h3>
                                                 <span className={`${styles['status-badge']} ${styles[`status-${request.status}`]}`}>{request.status}</span>
                                             </div>
                                             <div className={styles['row-meta']}>
                                                 <div className={styles['meta-item']}>
-                                                    <i className="fas fa-tag"></i>
-                                                    <span>{request.donationCategory}</span>
+                                                    <i className="fas fa-user"></i>
+                                                    <span>Donor: {request.ownerName || 'Unknown'}</span>
                                                 </div>
+                                                {request.projectTitle && (
+                                                    <div className={styles['meta-item']}>
+                                                        <i className="fas fa-project-diagram"></i>
+                                                        <span>Project: {request.projectTitle}</span>
+                                                    </div>
+                                                )}
+                                                {request.urgencyLevel && (
+                                                    <div className={styles['meta-item']}>
+                                                        <i className="fas fa-exclamation-circle"></i>
+                                                        <span>Urgency: {request.urgencyLevel}</span>
+                                                    </div>
+                                                )}
                                                 <div className={styles['meta-item']}>
                                                     <i className="fas fa-cube"></i>
                                                     <span>Qty: {request.quantity}</span>
@@ -429,6 +529,51 @@ export default function DonationsPage() {
                                                     <span>{new Date(request.createdAt).toLocaleDateString()}</span>
                                                 </div>
                                             </div>
+                                            {(request.status === 'approved' || request.status === 'completed') && (
+                                                <div className={styles['delivery-info']} style={{marginTop: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>
+                                                    <div className={styles['info-item']}>
+                                                        <strong>Delivery Status:</strong> {request.deliveryStatus || 'Pending'}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className={styles['row-actions']}>
+                                            {request.status === 'pending' && (
+                                                <>
+                                                    <button 
+                                                        className={styles['btn-view']}
+                                                        style={{backgroundColor: '#FF9800', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px'}}
+                                                        onClick={() => handleEditRequest(request)}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button 
+                                                        className={styles['btn-reject']}
+                                                        onClick={() => handleCancelRequest(request)}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </>
+                                            )}
+                                            
+                                            {(request.status === 'approved' || request.status === 'completed') && (
+                                                <button
+                                                    className={styles['btn-view']}
+                                                    style={{backgroundColor: '#2196F3', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer'}}
+                                                    onClick={() => { setSelectedRequestForStatus(request); setShowStatusModal(true); }}
+                                                >
+                                                    View Details
+                                                </button>
+                                            )}
+
+                                            {(request.status === 'rejected' || request.status === 'cancelled') && (
+                                                <button 
+                                                    className={styles['btn-reject']}
+                                                    onClick={() => handleDeleteRequest(request.id)}
+                                                >
+                                                    <i className="fas fa-trash"></i>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -488,15 +633,25 @@ export default function DonationsPage() {
                 )}
             </div>
 
-            {/* Status Modal */}
+            {/* Status Modal (View Details) */}
             {showStatusModal && selectedRequestForStatus && (
                 <div className={styles['modal-overlay']}>
                     <div className={styles['modal-content']}>
                         <div className={styles['modal-header']}>
-                            <h3>Delivery Status</h3>
+                            <h3>View Details</h3>
                             <button onClick={() => setShowStatusModal(false)} className={styles['close-btn']}>×</button>
                         </div>
                         <div className={styles['modal-body']}>
+                            {/* Donation Image */}
+                            <div style={{textAlign: 'center', marginBottom: '20px'}}>
+                                <img 
+                                    src={selectedRequestForStatus.donationImage || '/placeholder-image.png'} 
+                                    alt={selectedRequestForStatus.donationTitle} 
+                                    style={{width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px'}}
+                                />
+                                <h4 style={{marginTop: '10px'}}>{selectedRequestForStatus.donationTitle}</h4>
+                            </div>
+
                             <div className={styles['status-timeline']}>
                                 {['Pending Item', 'Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'].map((step, index) => {
                                     const currentStatus = selectedRequestForStatus.deliveryStatus || 'Pending Item';
@@ -529,6 +684,80 @@ export default function DonationsPage() {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Cancel Button in View Details */}
+                             {activeTab === 'my-requests' && selectedRequestForStatus.status !== 'cancelled' && (
+                                <div style={{marginTop: '20px', textAlign: 'right'}}>
+                                    <button 
+                                        className={styles['btn-reject']}
+                                        style={{
+                                            padding: '10px 20px',
+                                            opacity: (['Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'].includes(selectedRequestForStatus.deliveryStatus || '')) ? 0.5 : 1,
+                                            cursor: (['Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'].includes(selectedRequestForStatus.deliveryStatus || '')) ? 'not-allowed' : 'pointer'
+                                        }}
+                                        disabled={['Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'].includes(selectedRequestForStatus.deliveryStatus || '')}
+                                        onClick={() => handleCancelRequest(selectedRequestForStatus)}
+                                    >
+                                        Cancel Request
+                                    </button>
+                                    {['Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'].includes(selectedRequestForStatus.deliveryStatus || '') && (
+                                        <p style={{fontSize: '12px', color: '#999', marginTop: '5px'}}>
+                                            Cannot cancel after processing has started.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Request Modal */}
+            {showEditModal && selectedRequestForEdit && (
+                <div className={styles['modal-overlay']}>
+                    <div className={styles['modal-content']}>
+                        <div className={styles['modal-header']}>
+                            <h3>Edit Request</h3>
+                            <button onClick={() => setShowEditModal(false)} className={styles['close-btn']}>×</button>
+                        </div>
+                        <div className={styles['modal-body']}>
+                            <div style={{marginBottom: '15px'}}>
+                                <label style={{display: 'block', marginBottom: '5px', fontWeight: 'bold'}}>Quantity</label>
+                                <input 
+                                    type="number" 
+                                    min="1"
+                                    value={editQuantity}
+                                    onChange={(e) => setEditQuantity(parseInt(e.target.value))}
+                                    style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc'}}
+                                />
+                            </div>
+                            <div style={{marginBottom: '20px'}}>
+                                <label style={{display: 'block', marginBottom: '5px', fontWeight: 'bold'}}>Urgency Level</label>
+                                <select 
+                                    value={editUrgency}
+                                    onChange={(e) => setEditUrgency(e.target.value)}
+                                    style={{width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc'}}
+                                >
+                                    <option value="Low">Low</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="High">High</option>
+                                    <option value="Critical">Critical</option>
+                                </select>
+                            </div>
+                            <div style={{display: 'flex', justifyContent: 'flex-end', gap: '10px'}}>
+                                <button 
+                                    onClick={() => setShowEditModal(false)}
+                                    style={{padding: '8px 16px', borderRadius: '4px', border: '1px solid #ccc', background: 'white', cursor: 'pointer'}}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleSaveEdit}
+                                    style={{padding: '8px 16px', borderRadius: '4px', border: 'none', background: '#2e8b57', color: 'white', cursor: 'pointer'}}
+                                >
+                                    Save Changes
+                                </button>
                             </div>
                         </div>
                     </div>
