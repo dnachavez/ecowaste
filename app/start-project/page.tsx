@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ref, push, set } from 'firebase/database';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ref, push, set, get } from 'firebase/database';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../context/AuthContext';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './start-project.module.css';
+import { Step } from '../../components/RecycledIdeaPopup';
 
 interface MaterialInput {
   id: string;
@@ -22,9 +23,11 @@ const generateId = () => {
   return Date.now().toString() + Math.random().toString(36).substring(2, 11);
 };
 
-export default function StartProjectPage() {
+function StartProjectContent() {
   const router = useRouter();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const ideaId = searchParams.get('ideaId');
   
   // Form State
   const [projectName, setProjectName] = useState('');
@@ -32,7 +35,44 @@ export default function StartProjectPage() {
   const [materials, setMaterials] = useState<MaterialInput[]>([
     { id: '1', name: '', quantity: '', unit: '' }
   ]);
+  const [steps, setSteps] = useState<Step[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (ideaId) {
+        const ideaRef = ref(db, `projects/${ideaId}`);
+        get(ideaRef).then((snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                setProjectName(data.title || '');
+                setProjectDescription(data.description || '');
+                
+                if (data.materials) {
+                    const mats = Array.isArray(data.materials) ? data.materials : Object.values(data.materials);
+                    setMaterials(mats.map((m: { name: string; needed?: number; quantity?: string; unit?: string }) => ({
+                        id: generateId(),
+                        name: m.name,
+                        quantity: m.needed?.toString() || m.quantity?.toString() || '1',
+                        unit: m.unit || 'units'
+                    })));
+                }
+                
+                if (data.steps) {
+                    const loadedSteps = Array.isArray(data.steps) ? data.steps : Object.values(data.steps);
+                    // Clear images so user uploads their own, but keep other data
+                    setSteps(loadedSteps.map((s: { id?: string; step_number: number; title: string; description: string }) => ({
+                        id: s.id || generateId(),
+                        step_number: s.step_number,
+                        title: s.title,
+                        description: s.description,
+                        is_completed: false,
+                        images: [] 
+                    })));
+                }
+            }
+        }).catch(err => console.error("Error fetching idea:", err));
+    }
+  }, [ideaId]);
 
   // Handlers
   const handleAddMaterial = () => {
@@ -91,11 +131,19 @@ export default function StartProjectPage() {
       const projectsRef = ref(db, 'projects');
       const newProjectRef = push(projectsRef);
       
+      // Convert steps array to object/map to avoid array index keys in Firebase
+      const stepsMap = steps.reduce((acc, step) => {
+          // Ensure we use the step.id as the key
+          acc[step.id] = step;
+          return acc;
+      }, {} as Record<string, Step>);
+
       const projectData = {
         id: newProjectRef.key,
         title: projectName,
         description: projectDescription,
         materials: processedMaterials,
+        steps: stepsMap, // Save the pre-filled steps as a map
         authorId: user.uid,
         authorName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
         createdAt: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
@@ -197,6 +245,24 @@ export default function StartProjectPage() {
               <i className="fas fa-plus"></i> Add Another Material
             </button>
           </div>
+
+          {/* Display Steps if available (Read-only for now as per "pre-filled" requirement) */}
+          {steps.length > 0 && (
+              <div className={styles['form-group']}>
+                  <label>Construction Steps (Pre-filled)</label>
+                  <div style={{marginTop: '10px', border: '1px solid #ddd', borderRadius: '8px', padding: '15px', backgroundColor: '#f9f9f9'}}>
+                      {steps.sort((a,b) => a.step_number - b.step_number).map((step, index) => (
+                          <div key={index} style={{marginBottom: '10px', paddingBottom: '10px', borderBottom: index < steps.length - 1 ? '1px solid #eee' : 'none'}}>
+                              <div style={{fontWeight: 'bold', marginBottom: '5px'}}>Step {step.step_number}: {step.title}</div>
+                              <div style={{fontSize: '14px', color: '#555'}}>{step.description}</div>
+                          </div>
+                      ))}
+                      <div style={{fontSize: '12px', color: '#888', fontStyle: 'italic', marginTop: '10px'}}>
+                          * You can upload photos for these steps in the Construction stage.
+                      </div>
+                  </div>
+              </div>
+          )}
           
           <div className={styles['form-actions']}>
             <Link href="/projects" className={`${styles.btn} ${styles['btn-secondary']}`}>
@@ -211,4 +277,12 @@ export default function StartProjectPage() {
     </div>
     </ProtectedRoute>
   );
+}
+
+export default function StartProjectPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <StartProjectContent />
+        </Suspense>
+    );
 }

@@ -100,8 +100,8 @@ export default function ProjectDetailsPage() {
           }) : [];
           
           const stepsList = data.steps ? Object.entries(data.steps as Record<string, Omit<Step, 'id'>>).map(([key, value]) => ({
-            id: key,
-            ...value
+            ...value,
+            id: key
           })) : [];
 
           setProject({

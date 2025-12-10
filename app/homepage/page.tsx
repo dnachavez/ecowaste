@@ -204,8 +204,12 @@ export default function Homepage() {
   };
 
   const handleConfirmIdea = () => {
+    if (selectedIdea) {
+        router.push(`/start-project?ideaId=${selectedIdea.id}`);
+    } else {
+        router.push('/start-project');
+    }
     handleCloseIdeaPopup();
-    router.push('/start-project');
   };
 
 
@@ -693,7 +697,6 @@ export default function Homepage() {
                     </p>
                     <div className={styles.ideaActions}>
                         <button className={styles.actionBtn} onClick={() => handleTryIdeaClick(idea)}>Try This Idea</button>
-                        <span className={styles.comments}>{idea.commentsCount} Comments</span>
                     </div>
                  </div>
              ))}
