@@ -420,12 +420,22 @@ function BrowseContent() {
                                 </div>
 
                                 <div className={styles.donationActions}>
-                                    <button 
-                                        className={styles.requestBtn}
-                                        onClick={() => openRequestModal(donation)}
-                                    >
-                                        Request Donation
-                                    </button>
+                                    {user && donation.user.id !== user.uid ? (
+                                        <button 
+                                            className={styles.requestBtn}
+                                            onClick={() => openRequestModal(donation)}
+                                        >
+                                            Request Donation
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            className={styles.requestBtn}
+                                            style={{ backgroundColor: '#ccc', cursor: 'default' }}
+                                            disabled
+                                        >
+                                            Your Donation
+                                        </button>
+                                    )}
                                     <button className={styles.commentsBtn} onClick={() => toggleComments(donation.id)}>
                                         <i className="fas fa-comment"></i> Comments
                                     </button>

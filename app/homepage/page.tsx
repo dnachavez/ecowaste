@@ -655,9 +655,15 @@ export default function Homepage() {
                     </div>
 
                     <div className={styles.donationActions}>
-                      <button type="button" className={styles.requestBtn} onClick={() => handleRequestClick(donation)}>
-                        Request Donation
-                      </button>
+                      {user && donation.user.id !== user.uid ? (
+                        <button type="button" className={styles.requestBtn} onClick={() => handleRequestClick(donation)}>
+                          Request Donation
+                        </button>
+                      ) : (
+                        <button type="button" className={styles.requestBtn} style={{ backgroundColor: '#ccc', cursor: 'default' }} disabled>
+                          Your Donation
+                        </button>
+                      )}
 
                       <button className={styles.commentsBtn} onClick={() => toggleComments(donation.id)}>
                         <i className="fas fa-comment"></i> Comments
@@ -745,7 +751,7 @@ export default function Homepage() {
                       </div>
                   )}
                   {userProjects.map(project => (
-                      <Link key={project.id} href={`/project_details/${project.id}`} className={styles.projectItemLink}>
+                      <Link key={project.id} href={`/projects/${project.id}`} className={styles.projectItemLink}>
                           <div className={styles.projectItem}>
                               <strong>{project.title}</strong>
                               <div>{project.description}</div>
