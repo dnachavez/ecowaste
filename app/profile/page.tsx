@@ -166,13 +166,10 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-    <div style={{ backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
+    <div className={styles.container}>
       <Header />
-      
-      <div className={styles.container}>
-        <Sidebar />
-        
-        <main className={styles.mainContent}>
+      <Sidebar />
+      <main className={styles.mainContent}>
           {/* Back navigation and page title */}
           <div className={styles.backNavigation}>
             <Link href="/homepage" className={styles.backButton}>
@@ -322,7 +319,6 @@ export default function ProfilePage() {
             </ul>
           </div>
         </main>
-      </div>
 
       {/* Edit Profile Modal */}
       {showEditProfileModal && (
