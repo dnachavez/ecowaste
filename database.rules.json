@@ -2,9 +2,14 @@
   "rules": {
     "users": {
       ".read": "auth != null",
+      ".indexOn": ["role"],
       "$uid": {
-        ".write": "$uid === auth.uid"
+        ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
       }
+    },
+    "tasks": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
     },
     "donations": {
       ".read": "auth != null",

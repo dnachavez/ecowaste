@@ -39,6 +39,15 @@ export default function ProfilePage() {
     zipCode: ''
   });
 
+  const [stats, setStats] = useState({
+    xp: 0,
+    level: 1,
+    badges: [] as string[],
+    recyclingCount: 0,
+    donationCount: 0,
+    projectsCompleted: 0
+  });
+
   useEffect(() => {
     if (user) {
         const userRef = ref(db, 'users/' + user.uid);
@@ -56,6 +65,14 @@ export default function ProfilePage() {
                     city: data.city || '',
                     zipCode: data.zipCode || ''
                 }));
+                setStats({
+                    xp: data.xp || 0,
+                    level: data.level || 1,
+                    badges: data.badges || [],
+                    recyclingCount: data.recyclingCount || 0,
+                    donationCount: data.donationCount || 0,
+                    projectsCompleted: data.projectsCompleted || 0
+                });
             } else {
                  // Initialize from Auth if no DB data
                  const names = user.displayName ? user.displayName.split(' ') : [];
@@ -164,6 +181,8 @@ export default function ProfilePage() {
     setTextError(false);
   };
 
+  const hasBadge = (id: string) => stats.badges.includes(id) || stats.badges.includes(id.toUpperCase());
+
   return (
     <ProtectedRoute>
     <div className={styles.container}>
@@ -185,8 +204,8 @@ export default function ProfilePage() {
             <div className={styles.profileInfo}>
               <h2>{user?.displayName || 'Guest User'}</h2>
               <p>Member since {memberSinceDate}</p>
-              <p><i className="fas fa-map-marker-alt"></i> {profileForm.city}</p>
-              <span className={styles.profileLevel}>Level 1 Eco Warrior</span>
+              <p><i className="fas fa-map-marker-alt"></i> {profileForm.city || 'No Location'}</p>
+              <span className={styles.profileLevel}>Level {stats.level} Eco Warrior</span>
             </div>
             <button 
               className={styles.editProfileBtn} 
@@ -227,22 +246,22 @@ export default function ProfilePage() {
           <div className={styles.profileStats}>
             <div className={styles.statCard}>
               <i className="fas fa-recycle"></i>
-              <h3>0</h3>
+              <h3>{stats.recyclingCount}</h3>
               <p>Items Recycled</p>
             </div>
             <div className={styles.statCard}>
               <i className="fas fa-hand-holding-heart"></i>
-              <h3>0</h3>
+              <h3>{stats.donationCount}</h3>
               <p>Items Donated</p>
             </div>
             <div className={styles.statCard}>
               <i className="fas fa-tasks"></i>
-              <h3>0</h3>
+              <h3>{stats.projectsCompleted}</h3>
               <p>Projects Completed</p>
             </div>
             <div className={styles.statCard}>
               <i className="fas fa-star"></i>
-              <h3>0</h3>
+              <h3>{stats.xp}</h3>
               <p>Eco Points</p>
             </div>
           </div>
@@ -259,43 +278,38 @@ export default function ProfilePage() {
             </div>
 
             <div className={styles.badgesGrid}>
-              {/* Visible Badges */}
-              <BadgeItem icon="recycle" title="Recycling Pro" desc="Recycled 10+ items" progress={0} total={10} />
-              <BadgeItem icon="hand-holding-heart" title="Donation Hero" desc="Donated 5+ items" progress={0} total={5} />
-              <BadgeItem icon="project-diagram" title="Project Master" desc="Completed 3+ projects" progress={0} total={3} />
-              <BadgeItem icon="seedling" title="EcoWaste Beginner" desc="Completed your first eco activity" progress={0} total={1} />
-              <BadgeItem icon="hand-holding-heart" title="Rising Donor" desc="Completed your first donation" progress={0} total={1} />
+              {/* Main Badges */}
+              <BadgeItem 
+                icon="mountain" 
+                title="Sierra Madre" 
+                desc="Reached Level 5" 
+                progress={stats.level} 
+                total={5} 
+                unlocked={hasBadge('sierra_madre') || stats.level >= 5}
+                customIcon="/sierra_madre_badge.svg"
+              />
+              <BadgeItem 
+                icon="recycle" 
+                title="Eco Warrior" 
+                desc="Recycled 10+ items" 
+                progress={stats.recyclingCount} 
+                total={10} 
+                unlocked={hasBadge('eco_warrior') || stats.recyclingCount >= 10} 
+              />
+              <BadgeItem 
+                icon="hand-holding-heart" 
+                title="Generous Soul" 
+                desc="Donated 5+ items" 
+                progress={stats.donationCount} 
+                total={5} 
+                unlocked={hasBadge('generous_soul') || stats.donationCount >= 5} 
+              />
               
-              {/* Hidden Badges */}
+              {/* Additional Badges (Placeholders or Future) */}
               {showAllBadges && (
                 <>
-                  <BadgeItem icon="star" title="Eco Star" desc="Completed a recycling project" progress={0} total={1} />
-                  <BadgeItem icon="hand-holding-heart" title="Donation Starter" desc="Donated 1 item" progress={0} total={1} />
-                  <BadgeItem icon="gift" title="Donation Champion" desc="Donated 15+ items" progress={0} total={15} />
-                  <BadgeItem icon="hands-helping" title="Generous Giver" desc="Completed 20 donations" progress={0} total={20} />
-                  <BadgeItem icon="award" title="Charity Champion" desc="Completed 30 donations" progress={0} total={30} />
-                  <BadgeItem icon="recycle" title="Recycling Starter" desc="Recycled 1 item" progress={0} total={1} />
-                  <BadgeItem icon="recycle" title="Recycling Expert" desc="Recycled 15+ items" progress={0} total={15} />
-                  <BadgeItem icon="project-diagram" title="Zero Waste Hero" desc="Created 25 recycling projects" progress={1} total={25} percent={4} />
-                  <BadgeItem icon="globe" title="Earth Saver" desc="Created 30 recycling projects" progress={1} total={30} percent={3.33} />
-                  <BadgeItem icon="seedling" title="Eco Pro" desc="Completed 20 recycling projects" progress={0} total={20} />
-                  <BadgeItem icon="trophy" title="EcoLegend" desc="Completed 30 recycling projects" progress={0} total={1} />
-                  <BadgeItem icon="star" title="EcoWaste Rookie" desc="Earned 50+ points" progress={0} total={50} />
-                  <BadgeItem icon="medal" title="EcoWaste Master" desc="Earned 100+ points" progress={0} total={100} />
-                  <BadgeItem icon="trophy" title="EcoWaste Warrior" desc="Earned 200+ points" progress={0} total={200} />
-                  <BadgeItem icon="crown" title="EcoWaste Legend" desc="Earned 500+ points" progress={0} total={500} />
-                  {/* Sierra Madre Badge - custom image */}
-                  <div className={`${styles.badgeItem} ${styles.locked}`}>
-                    <div className={styles.badgeIcon}>
-                      <img src="/sierra_madre_badge.svg" alt="Sierra Madre" style={{width: '30px', filter: 'brightness(0) invert(1)'}} onError={(e) => {e.currentTarget.style.display='none'; e.currentTarget.parentElement!.innerHTML = '<i class="fas fa-mountain"></i>'}} />
-                    </div>
-                    <h4>Sierra Madre</h4>
-                    <p>Complete all achievement tasks to unlock this legendary badge</p>
-                    <div className={styles.badgeProgress}>
-                      <div className={styles.progressBar} style={{ width: '0%' }}></div>
-                    </div>
-                    <small>0 / 1 completed</small>
-                  </div>
+                  <BadgeItem icon="project-diagram" title="Project Master" desc="Completed 3+ projects" progress={stats.projectsCompleted} total={3} unlocked={stats.projectsCompleted >= 3} />
+                  <BadgeItem icon="star" title="Eco Star" desc="Earned 100 XP" progress={stats.xp} total={100} unlocked={stats.xp >= 100} />
                 </>
               )}
             </div>
@@ -307,18 +321,22 @@ export default function ProfilePage() {
               <a href="#" className={styles.viewAll}>View All</a>
             </div>
             <ul className={styles.recentActivity}>
-              <li className={styles.activityItem}>
-                <div className={styles.activityIcon}>
-                  <i className="fas fa-project-diagram"></i>
-                </div>
-                <div className={styles.activityContent}>
-                  <h4>In progress project: Plastic Bottle Vase</h4>
-                  <div className={styles.activityTime}>1 day ago</div>
-                </div>
-              </li>
+                {stats.xp > 0 ? (
+                    <li className={styles.activityItem}>
+                        <div className={styles.activityIcon}>
+                            <i className="fas fa-star"></i>
+                        </div>
+                        <div className={styles.activityContent}>
+                            <h4>Earned XP</h4>
+                            <div className={styles.activityTime}>Total: {stats.xp} XP</div>
+                        </div>
+                    </li>
+                ) : (
+                    <div style={{color: '#666', padding: '10px'}}>No recent activity</div>
+                )}
             </ul>
           </div>
-        </main>
+      </main>
 
       {/* Edit Profile Modal */}
       {showEditProfileModal && (
@@ -510,21 +528,33 @@ export default function ProfilePage() {
   );
 }
 
-// Helper component for badges to reduce repetition
-function BadgeItem({ icon, title, desc, progress, total, percent }: { icon: string, title: string, desc: string, progress: number, total: number, percent?: number }) {
-  const percentage = percent !== undefined ? percent : (progress / total) * 100;
+// Helper component for badges
+function BadgeItem({ icon, title, desc, progress, total, percent, unlocked, customIcon }: { icon: string, title: string, desc: string, progress: number, total: number, percent?: number, unlocked: boolean, customIcon?: string }) {
+  const percentage = percent !== undefined ? percent : Math.min(100, (progress / total) * 100);
   
   return (
-    <div className={`${styles.badgeItem} ${styles.locked}`}>
+    <div className={`${styles.badgeItem} ${!unlocked ? styles.locked : ''}`}>
       <div className={styles.badgeIcon}>
-        <i className={`fas fa-${icon}`}></i>
+        {customIcon ? (
+             <img src={customIcon} alt={title} style={{width: '30px', filter: unlocked ? 'none' : 'grayscale(100%) opacity(0.5)'}} />
+        ) : (
+             <i className={`fas fa-${icon}`}></i>
+        )}
       </div>
       <h4>{title}</h4>
       <p>{desc}</p>
-      <div className={styles.badgeProgress}>
-        <div className={styles.progressBar} style={{ width: `${percentage}%` }}></div>
-      </div>
-      <small>{progress} / {total} completed</small>
+      {unlocked ? (
+           <div style={{color: '#82AA52', fontSize: '12px', fontWeight: 'bold', marginTop: '10px'}}>
+             <i className="fas fa-check-circle"></i> Unlocked
+           </div>
+      ) : (
+        <>
+            <div className={styles.badgeProgress}>
+                <div className={styles.progressBar} style={{ width: `${percentage}%` }}></div>
+            </div>
+            <small>{progress} / {total} completed</small>
+        </>
+      )}
     </div>
   );
 }

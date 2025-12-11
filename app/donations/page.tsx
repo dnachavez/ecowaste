@@ -10,6 +10,7 @@ import { ref, query, orderByChild, equalTo, onValue, update, remove, runTransact
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { createNotification } from '../../lib/notifications';
+import { incrementAction } from '../../lib/gamification';
 
 interface Donation {
   id: string;
@@ -61,7 +62,6 @@ export default function DonationsPage() {
   // Status Modal State
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedRequestForStatus, setSelectedRequestForStatus] = useState<Request | null>(null);
-  const [editStatusDate, setEditStatusDate] = useState('');
   
   // Edit Modal State
   const [showEditModal, setShowEditModal] = useState(false);
@@ -208,59 +208,6 @@ export default function DonationsPage() {
               }
           })
           .catch((error) => console.error("Error updating status:", error));
-    }
-  };
-
-  const handleSaveStatusUpdate = async (newStatus: string) => {
-    if (!selectedRequestForStatus) return;
-    
-    try {
-        const updates: Partial<Request> = {
-            deliveryStatus: newStatus
-        };
-
-        let notificationMessage = '';
-        let notificationTitle = '';
-
-        if (newStatus === 'Ready for Pickup') {
-            if (!editStatusDate) {
-                alert("Please select a pickup date.");
-                return;
-            }
-            updates.estimatedPickupDate = new Date(editStatusDate).toISOString();
-            notificationTitle = 'Donation Ready for Pickup';
-            notificationMessage = `Your request for "${selectedRequestForStatus.donationTitle}" is ready for pickup on ${new Date(editStatusDate).toLocaleDateString()}.`;
-        } else if (newStatus === 'In Transit') {
-             notificationTitle = 'Donation In Transit';
-             notificationMessage = `Your request for "${selectedRequestForStatus.donationTitle}" is now in transit.`;
-        } else if (newStatus === 'Delivered') {
-            updates.deliveredDate = new Date().toISOString();
-            updates.status = 'completed';
-            notificationTitle = 'Donation Delivered';
-            notificationMessage = `Your request for "${selectedRequestForStatus.donationTitle}" has been delivered!`;
-        } else if (newStatus === 'Pending Item' && editStatusDate) {
-             updates.estimatedDeliveryDate = new Date(editStatusDate).toISOString();
-             notificationTitle = 'Delivery Update';
-             notificationMessage = `The estimated delivery date for "${selectedRequestForStatus.donationTitle}" has been updated to ${new Date(editStatusDate).toLocaleDateString()}.`;
-        }
-
-        await update(ref(db, `requests/${selectedRequestForStatus.id}`), updates);
-        
-        if (notificationTitle) {
-            await createNotification(
-                selectedRequestForStatus.requesterId,
-                notificationTitle,
-                notificationMessage,
-                'success',
-                selectedRequestForStatus.id
-            );
-        }
-
-        setShowStatusModal(false);
-        setEditStatusDate('');
-    } catch (error) {
-        console.error("Error updating status:", error);
-        alert("Failed to update status.");
     }
   };
 
@@ -725,65 +672,6 @@ export default function DonationsPage() {
                                 />
                                 <h4 style={{marginTop: '10px'}}>{selectedRequestForStatus.donationTitle}</h4>
                             </div>
-
-                            {/* Manage Status Section (For Donor) */}
-                            {user && selectedRequestForStatus.ownerId === user.uid && selectedRequestForStatus.status !== 'cancelled' && (
-                                <div style={{marginBottom: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px', border: '1px solid #eee'}}>
-                                    <h4 style={{marginTop: 0, marginBottom: '10px', color: '#2e8b57'}}>Manage Status</h4>
-                                    
-                                    <div style={{marginBottom: '10px'}}>
-                                        <label style={{display: 'block', fontSize: '12px', marginBottom: '5px', fontWeight: 'bold'}}>Update Status To:</label>
-                                        <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
-                                            {['Pending Item', 'Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'].map(status => (
-                                                <button
-                                                    key={status}
-                                                    onClick={() => handleSaveStatusUpdate(status)}
-                                                    disabled={status === selectedRequestForStatus.deliveryStatus}
-                                                    style={{
-                                                        padding: '6px 12px',
-                                                        borderRadius: '20px',
-                                                        border: '1px solid #ccc',
-                                                        backgroundColor: status === selectedRequestForStatus.deliveryStatus ? '#2e8b57' : 'white',
-                                                        color: status === selectedRequestForStatus.deliveryStatus ? 'white' : '#333',
-                                                        cursor: status === selectedRequestForStatus.deliveryStatus ? 'default' : 'pointer',
-                                                        fontSize: '12px'
-                                                    }}
-                                                >
-                                                    {status}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div style={{marginTop: '15px'}}>
-                                        <label style={{display: 'block', fontSize: '12px', marginBottom: '5px', fontWeight: 'bold'}}>Set Date (for Pickup/Delivery):</label>
-                                        <div style={{display: 'flex', gap: '10px'}}>
-                                            <input 
-                                                type="date" 
-                                                value={editStatusDate}
-                                                onChange={(e) => setEditStatusDate(e.target.value)}
-                                                style={{padding: '8px', borderRadius: '4px', border: '1px solid #ccc', flex: 1}}
-                                            />
-                                            <button
-                                                onClick={() => {
-                                                    // Determine which date to update based on current or selected status
-                                                    // For simplicity, let's say if they pick a date and click "Update Date", it updates the date for the CURRENT status
-                                                    if (!editStatusDate) return;
-                                                    handleSaveStatusUpdate(selectedRequestForStatus.deliveryStatus || 'Pending Item');
-                                                }}
-                                                style={{padding: '8px 16px', backgroundColor: '#2e8b57', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}
-                                            >
-                                                Update Date
-                                            </button>
-                                        </div>
-                                        <p style={{fontSize: '11px', color: '#666', marginTop: '5px'}}>
-                                            * Select a date and click &quot;Update Date&quot; to update the estimated date for the current status.
-                                            <br/>
-                                            * Or select a date THEN click a new status above (e.g. &quot;Ready for Pickup&quot;) to set the date with the status change.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
 
                             <div className={styles['status-timeline']}>
                                 {['Pending Item', 'Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'].map((step, index) => {

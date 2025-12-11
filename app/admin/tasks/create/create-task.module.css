@@ -1,0 +1,78 @@
+.container {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  max-width: 1200px;
+  margin: 0 auto;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.mainContent {
+  padding: 30px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  margin-top: 20px;
+}
+
+.title {
+  color: #2e8b57;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 600px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-weight: 600;
+  color: #333;
+}
+
+.input, .textarea, .select {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.button {
+  background-color: #82AA52;
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+  align-self: flex-start;
+}
+
+.button:hover {
+  background-color: #6d8f45;
+}
+
+.success {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}

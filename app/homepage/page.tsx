@@ -10,6 +10,7 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './homepage.module.css';
 import { db } from '../../lib/firebase';
 import { ref, push, onValue } from 'firebase/database';
+import { incrementAction } from '../../lib/gamification';
 
 import RecycledIdeaPopup, { RecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
 
@@ -355,6 +356,22 @@ export default function Homepage() {
       const donationsRef = ref(db, 'donations');
       await push(donationsRef, donationData);
 
+      // Award XP for donating (action initialized)
+      // Note: We also award XP when donation is DELIVERED in app/donations/page.tsx.
+      // We should probably only award for ONE of these events to avoid double counting, 
+      // OR award a small amount here for listing and a larger amount for completing.
+      // Let's award a small amount (e.g. 5 XP) for listing to encourage activity.
+      // But for now, to keep it simple and consistent with the requirement "Donated 5+ items",
+      // we should probably count "Donated" as "Listed and Delivered" or just "Listed"?
+      // Usually "Donated" means you gave it away.
+      // In app/donations/page.tsx I added incrementAction when status becomes 'completed'.
+      // So I won't add it here to avoid double counting for the "Donated 5+ items" badge.
+      // HOWEVER, the user might want immediate feedback.
+      // Let's assume 'Donated' badge counts COMPLETED donations.
+      // But we can give some XP for *posting* a donation request?
+      // Let's leave it for now to avoid confusion. The prompt said "donating 5 or more items".
+      // I'll assume that means successfully donating.
+      
       setShowDonationPopup(false);
       setShowSuccessPopup(true);
       

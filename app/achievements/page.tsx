@@ -1,22 +1,98 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import Image from 'next/image';
 import styles from './achievements.module.css';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../lib/firebase';
+import { ref, onValue, update, get } from 'firebase/database';
+import { awardXP, getNextLevelXp, incrementAction } from '../../lib/gamification';
+
+interface Task {
+    id: string;
+    title: string;
+    description: string;
+    xpReward: number;
+    type: 'recycle' | 'donate' | 'other';
+    target?: number;
+    pickupDate?: string;
+    deliveryDate?: string;
+}
 
 export default function Achievements() {
-    const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+    const { user } = useAuth();
+    const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
+        'donation': true,
+        'recycling': true,
+        'other': true
+    });
     
-    // Feedback Modal State
+    // User Stats
+    const [stats, setStats] = useState({
+        xp: 0,
+        level: 1,
+        badges: [] as string[],
+        recyclingCount: 0,
+        donationCount: 0,
+        projectsCompleted: 0
+    });
+    
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [completedTasks, setCompletedTasks] = useState<string[]>([]);
+    const [loadingTasks, setLoadingTasks] = useState(true);
+
+    // Feedback Modal State (kept from original)
     const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
     const [feedbackRating, setFeedbackRating] = useState(0);
     const [feedbackText, setFeedbackText] = useState('');
     const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
     const [showThankYou, setShowThankYou] = useState(false);
     const [feedbackError, setFeedbackError] = useState({ rating: false, text: false });
+
+    useEffect(() => {
+        if (user) {
+            // Fetch User Stats
+            const userRef = ref(db, `users/${user.uid}`);
+            const unsubscribeUser = onValue(userRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    setStats({
+                        xp: data.xp || 0,
+                        level: data.level || 1,
+                        badges: data.badges || [],
+                        recyclingCount: data.recyclingCount || 0,
+                        donationCount: data.donationCount || 0,
+                        projectsCompleted: data.projectsCompleted || 0 // Assuming this field exists
+                    });
+                    setCompletedTasks(data.completedTasks || []);
+                }
+            });
+
+            // Fetch Tasks
+            const tasksRef = ref(db, 'tasks');
+            const unsubscribeTasks = onValue(tasksRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const tasksList = Object.entries(data).map(([key, value]) => ({
+                        id: key,
+                        ...(value as Omit<Task, 'id'>)
+                    }));
+                    setTasks(tasksList);
+                } else {
+                    setTasks([]);
+                }
+                setLoadingTasks(false);
+            });
+
+            return () => {
+                unsubscribeUser();
+                unsubscribeTasks();
+            };
+        }
+    }, [user]);
 
     const toggleCategory = (category: string) => {
         setExpandedCategories(prev => ({
@@ -25,25 +101,120 @@ export default function Achievements() {
         }));
     };
 
+    const handleClaimTask = async (task: Task) => {
+        if (!user) return;
+        
+        try {
+            // Logic based on task type
+            if (task.type === 'recycle') {
+                // For recycling, claiming the task IS the action (logging the recycle)
+                // We increment the count and award the task's XP
+                await incrementAction(user.uid, 'recycle', task.target || 1, task.xpReward);
+            } else if (task.type === 'donate') {
+                 // For donations, we verify they have reached the milestone
+                 // Because donations are tracked via the donation system
+                 if (task.target && stats.donationCount < task.target) {
+                    alert(`You need to donate ${task.target - stats.donationCount} more items to claim this reward!`);
+                    return;
+                }
+                // If verified, we award the XP (bonus) but do NOT increment count (already done)
+                await awardXP(user.uid, task.xpReward);
+            } else {
+                // For other tasks, just award XP
+                await awardXP(user.uid, task.xpReward);
+            }
+
+            // Update completed tasks
+            const newCompleted = [...completedTasks, task.id];
+            await update(ref(db, `users/${user.uid}`), {
+                completedTasks: newCompleted
+            });
+            
+            alert(`Task Completed! You earned ${task.xpReward} XP.`);
+        } catch (error) {
+            console.error('Error completing task:', error);
+            alert('Something went wrong. Please try again.');
+        }
+    };
+
+    // Derived values
+    const nextLevelXp = getNextLevelXp(stats.level);
+    const progressPercent = Math.min(100, (stats.xp / nextLevelXp) * 100);
+    const circumference = 2 * Math.PI * 90; // r=90
+    const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+
+    const hasSierraMadre = stats.badges.includes('sierra_madre') || stats.badges.includes('SIERRA_MADRE');
+
+    // Group tasks
+    const donationTasks = tasks.filter(t => t.type === 'donate');
+    const recyclingTasks = tasks.filter(t => t.type === 'recycle');
+    const otherTasks = tasks.filter(t => t.type !== 'donate' && t.type !== 'recycle');
+
+    // Helper to render task list
+    const renderTaskList = (list: Task[]) => {
+        if (list.length === 0) return <div style={{padding: '15px', color: '#666', textAlign: 'center'}}>No tasks available</div>;
+        
+        return (
+            <div className={styles.taskList}>
+                {list.map(task => {
+                    const isCompleted = completedTasks.includes(task.id);
+                    return (
+                        <div key={task.id} className={styles.taskItem} style={{
+                            padding: '15px', 
+                            borderBottom: '1px solid #eee', 
+                            display: 'flex', 
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            opacity: isCompleted ? 0.6 : 1
+                        }}>
+                            <div>
+                                <h5 style={{margin: '0 0 5px 0', fontSize: '16px'}}>{task.title}</h5>
+                                <p style={{margin: 0, fontSize: '14px', color: '#666'}}>{task.description}</p>
+                                {(task.pickupDate || task.deliveryDate) && (
+                                    <div style={{marginTop: '5px', fontSize: '12px', color: '#555'}}>
+                                        {task.pickupDate && <span style={{marginRight: '10px'}}>Pickup: {task.pickupDate}</span>}
+                                        {task.deliveryDate && <span>Delivery: {task.deliveryDate}</span>}
+                                    </div>
+                                )}
+                                <span style={{fontSize: '12px', color: '#82AA52', fontWeight: 'bold'}}>+{task.xpReward} XP</span>
+                            </div>
+                            {isCompleted ? (
+                                <span style={{color: '#82AA52', fontWeight: 'bold'}}>Completed ✓</span>
+                            ) : (
+                                <button 
+                                    onClick={() => handleClaimTask(task)}
+                                    style={{
+                                        background: '#82AA52', 
+                                        color: 'white', 
+                                        border: 'none', 
+                                        padding: '8px 16px', 
+                                        borderRadius: '20px', 
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Claim
+                                </button>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
     const handleFeedbackSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+        // ... (keep existing feedback logic)
         const errors = {
             rating: feedbackRating === 0,
             text: feedbackText.trim() === ''
         };
-        
         setFeedbackError(errors);
-
         if (errors.rating || errors.text) return;
-
         setIsFeedbackSubmitting(true);
-
-        // Simulate API call
         setTimeout(() => {
             setIsFeedbackSubmitting(false);
             setShowThankYou(true);
-            
             setTimeout(() => {
                 setIsFeedbackModalOpen(false);
                 setShowThankYou(false);
@@ -80,46 +251,42 @@ export default function Achievements() {
                                     r="90" 
                                     cx="100" 
                                     cy="100" 
-                                    strokeDasharray="565.48" 
-                                    strokeDashoffset="565.48"
+                                    strokeDasharray={circumference} 
+                                    strokeDashoffset={strokeDashoffset}
                                 ></circle>
                             </svg>
                             <div className={styles.circle}>
                                 <div className={styles.circleInner}>
-                                    <div className={styles.levelNumber}>1</div>
+                                    <div className={styles.levelNumber}>{stats.level}</div>
                                     <div className={styles.levelLabel}>LEVEL</div>
                                 </div>
                             </div>
                         </div>
-                        <div className={styles.progressText}>0/25 pts</div>
-                        <div className={styles.currentLevel}>Progress to Level 2</div>
+                        <div className={styles.progressText}>{stats.xp}/{nextLevelXp} XP</div>
+                        <div className={styles.currentLevel}>Progress to Level {stats.level + 1}</div>
                     </div>
 
                     {/* Stats */}
                     <div className={styles.statsGrid}>
                         <div className={styles.statItem}>
-                            <div className={styles.statNumber}>0</div>
+                            <div className={styles.statNumber}>{stats.projectsCompleted}</div>
                             <div className={styles.statLabel}>Projects Completed</div>
                         </div>
                         <div className={styles.statItem}>
-                            <div className={styles.statNumber}>0</div>
-                            <div className={styles.statLabel}>Achievements Earned</div>
-                        </div>
-                        <div className={styles.statItem}>
-                            <div className={styles.statNumber}>0</div>
+                            <div className={styles.statNumber}>{stats.badges.length}</div>
                             <div className={styles.statLabel}>Badges Earned</div>
                         </div>
                         <div className={styles.statItem}>
-                            <div className={styles.statNumber}>0</div>
+                            <div className={styles.statNumber}>{stats.donationCount}</div>
                             <div className={styles.statLabel}>Total Donations</div>
                         </div>
                         <div className={styles.statItem}>
-                            <div className={styles.statNumber}>0</div>
-                            <div className={styles.statLabel}>Total Items Recycled</div>
+                            <div className={styles.statNumber}>{stats.recyclingCount}</div>
+                            <div className={styles.statLabel}>Items Recycled</div>
                         </div>
-                        <div className={styles.statItem}>
-                            <div className={styles.statNumber}>0</div>
-                            <div className={styles.statLabel}>Total Points</div>
+                         <div className={styles.statItem}>
+                            <div className={styles.statNumber}>{stats.xp}</div>
+                            <div className={styles.statLabel}>Total XP</div>
                         </div>
                     </div>
 
@@ -135,24 +302,10 @@ export default function Achievements() {
                                     onClick={() => toggleCategory('donation')}
                                 >
                                     <h4>Donation-related Tasks</h4>
-                                    <i className="fas fa-chevron-down"></i>
+                                    <i className={`fas fa-chevron-${expandedCategories['donation'] ? 'up' : 'down'}`}></i>
                                 </div>
                                 <div className={styles.categoryContent} style={{ display: expandedCategories['donation'] ? 'block' : 'none' }}>
-                                    {/* Task content would go here */}
-                                    <div style={{padding: '15px', color: '#666', textAlign: 'center'}}>No tasks available</div>
-                                </div>
-                            </div>
-                            
-                            <div className={styles.taskCategory}>
-                                <div 
-                                    className={`${styles.categoryHeader} ${expandedCategories['project'] ? styles.active : ''}`}
-                                    onClick={() => toggleCategory('project')}
-                                >
-                                    <h4>Project Creation Tasks</h4>
-                                    <i className="fas fa-chevron-down"></i>
-                                </div>
-                                <div className={styles.categoryContent} style={{ display: expandedCategories['project'] ? 'block' : 'none' }}>
-                                    <div style={{padding: '15px', color: '#666', textAlign: 'center'}}>No tasks available</div>
+                                    {renderTaskList(donationTasks)}
                                 </div>
                             </div>
                             
@@ -161,11 +314,24 @@ export default function Achievements() {
                                     className={`${styles.categoryHeader} ${expandedCategories['recycling'] ? styles.active : ''}`}
                                     onClick={() => toggleCategory('recycling')}
                                 >
-                                    <h4>Recycling Project Completion Tasks</h4>
-                                    <i className="fas fa-chevron-down"></i>
+                                    <h4>Recycling Tasks</h4>
+                                    <i className={`fas fa-chevron-${expandedCategories['recycling'] ? 'up' : 'down'}`}></i>
                                 </div>
                                 <div className={styles.categoryContent} style={{ display: expandedCategories['recycling'] ? 'block' : 'none' }}>
-                                    <div style={{padding: '15px', color: '#666', textAlign: 'center'}}>No tasks available</div>
+                                    {renderTaskList(recyclingTasks)}
+                                </div>
+                            </div>
+                            
+                            <div className={styles.taskCategory}>
+                                <div 
+                                    className={`${styles.categoryHeader} ${expandedCategories['other'] ? styles.active : ''}`}
+                                    onClick={() => toggleCategory('other')}
+                                >
+                                    <h4>Other Tasks</h4>
+                                    <i className={`fas fa-chevron-${expandedCategories['other'] ? 'up' : 'down'}`}></i>
+                                </div>
+                                <div className={styles.categoryContent} style={{ display: expandedCategories['other'] ? 'block' : 'none' }}>
+                                    {renderTaskList(otherTasks)}
                                 </div>
                             </div>
                         </div>
@@ -175,96 +341,68 @@ export default function Achievements() {
                     <div className={styles.sierraMadreSection}>
                         <div className={styles.sierraMadreHeader}>
                             <h3>🏆 Secret Badge</h3>
-                            <p className={styles.sierraSubtitle}>Complete all tasks to unlock the legendary Sierra Madre badge!</p>
+                            <p className={styles.sierraSubtitle}>Reach Level 5 to unlock the legendary Sierra Madre badge!</p>
                         </div>
-                        <div className={`${styles.sierraMadreBadgeContainer} ${styles.locked}`}>
+                        <div className={`${styles.sierraMadreBadgeContainer} ${!hasSierraMadre ? styles.locked : ''}`}>
                             <div className={styles.badgeIconWrapper}>
-                                <div className={`${styles.badgeIcon} ${styles.lockedBadgeIcon}`}>
+                                <div className={`${styles.badgeIcon} ${!hasSierraMadre ? styles.lockedBadgeIcon : ''}`}>
                                     <Image 
                                         src="/sierra_madre_badge.svg" 
                                         alt="Sierra Madre Badge" 
                                         width={100} 
                                         height={100}
-                                        style={{ filter: 'grayscale(100%) opacity(0.5)' }}
+                                        style={{ filter: !hasSierraMadre ? 'grayscale(100%) opacity(0.5)' : 'none' }}
                                     />
-                                    <div className={styles.lockOverlay}>🔒</div>
+                                    {!hasSierraMadre && <div className={styles.lockOverlay}>🔒</div>}
                                 </div>
                             </div>
                             <div className={styles.badgeInfoWrapper}>
                                 <h4 className={styles.badgeTitle}>Sierra Madre</h4>
-                                <p className={styles.badgeDescription}>Complete all achievement tasks to unlock this legendary badge</p>
-                                <div className={`${styles.badgeStatus} ${styles.lockedStatus}`}>
-                                    <i className="fas fa-lock"></i> Complete all tasks to unlock
+                                <p className={styles.badgeDescription}>Reach Level 5 to unlock this legendary badge</p>
+                                <div className={`${styles.badgeStatus} ${!hasSierraMadre ? styles.lockedStatus : ''}`} style={{color: hasSierraMadre ? '#82AA52' : undefined}}>
+                                    {hasSierraMadre ? (
+                                        <><i className="fas fa-check-circle"></i> Unlocked</>
+                                    ) : (
+                                        <><i className="fas fa-lock"></i> Reach Level 5 to unlock</>
+                                    )}
                                 </div>
-                                <div className={styles.badgeProgress}>
-                                    <div className={styles.badgeProgressText}>Progress: 0/0 tasks completed</div>
-                                    <div className={styles.badgeProgressBar}>
-                                        <div className={styles.badgeProgressFill} style={{width: '0%'}}></div>
+                                {!hasSierraMadre && (
+                                    <div className={styles.badgeProgress}>
+                                        <div className={styles.badgeProgressText}>Current Level: {stats.level}/5</div>
+                                        <div className={styles.badgeProgressBar}>
+                                            <div className={styles.badgeProgressFill} style={{width: `${Math.min(100, (stats.level / 5) * 100)}%`}}></div>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
             </main>
 
-            {/* Feedback Button */}
+            {/* Feedback Button (kept from original) */}
             <div className={styles.feedbackBtn} onClick={() => setIsFeedbackModalOpen(true)}>💬</div>
 
-            {/* Feedback Modal */}
+            {/* Feedback Modal (kept from original) */}
             {isFeedbackModalOpen && (
                 <div className={styles.feedbackModal} style={{display: 'flex'}}>
                     <div className={styles.feedbackContent}>
                         <span className={styles.feedbackCloseBtn} onClick={() => setIsFeedbackModalOpen(false)}>×</span>
-                        
                         {!showThankYou ? (
                             <form className={styles.feedbackForm} onSubmit={handleFeedbackSubmit}>
                                 <h3>Share Your Feedback</h3>
                                 <div className={styles.emojiRating}>
                                     {[1, 2, 3, 4, 5].map((rating) => (
-                                        <div 
-                                            key={rating}
-                                            className={`${styles.emojiOption} ${feedbackRating === rating ? styles.selected : ''}`}
-                                            onClick={() => setFeedbackRating(rating)}
-                                        >
-                                            <span className={styles.emoji}>
-                                                {rating === 1 && '😞'}
-                                                {rating === 2 && '😕'}
-                                                {rating === 3 && '😐'}
-                                                {rating === 4 && '🙂'}
-                                                {rating === 5 && '😍'}
-                                            </span>
-                                            <span className={styles.emojiLabel}>
-                                                {rating === 1 && 'Very Sad'}
-                                                {rating === 2 && 'Sad'}
-                                                {rating === 3 && 'Neutral'}
-                                                {rating === 4 && 'Happy'}
-                                                {rating === 5 && 'Very Happy'}
-                                            </span>
+                                        <div key={rating} className={`${styles.emojiOption} ${feedbackRating === rating ? styles.selected : ''}`} onClick={() => setFeedbackRating(rating)}>
+                                            <span className={styles.emoji}>{rating === 5 ? '😍' : rating === 4 ? '🙂' : rating === 3 ? '😐' : rating === 2 ? '😕' : '😞'}</span>
                                         </div>
                                     ))}
                                 </div>
-                                {feedbackError.rating && <div style={{color: '#e74c3c', fontSize: '13px', marginTop: '-15px', marginBottom: '15px'}}>Please select a rating</div>}
-                                
-                                <p className={styles.feedbackDetail}>Please share in detail what we can improve more?</p>
-                                <textarea 
-                                    placeholder="Your feedback helps us make EcoWaste better..."
-                                    value={feedbackText}
-                                    onChange={(e) => setFeedbackText(e.target.value)}
-                                ></textarea>
-                                {feedbackError.text && <div style={{color: '#e74c3c', fontSize: '13px', marginTop: '-15px', marginBottom: '15px'}}>Please provide your feedback</div>}
-                                
-                                <button type="submit" className={styles.feedbackSubmitBtn} disabled={isFeedbackSubmitting}>
-                                    {isFeedbackSubmitting ? 'Submitting...' : 'Submit Feedback'}
-                                </button>
+                                <textarea placeholder="Your feedback..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)}></textarea>
+                                <button type="submit" className={styles.feedbackSubmitBtn} disabled={isFeedbackSubmitting}>Submit</button>
                             </form>
                         ) : (
-                            <div className={styles.thankYouMessage} style={{display: 'block'}}>
-                                <span className={styles.thankYouEmoji}>🎉</span>
-                                <h3>Thank You!</h3>
-                                <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
-                                <p>Your opinion matters to us!</p>
-                            </div>
+                             <div className={styles.thankYouMessage} style={{display: 'block'}}><h3>Thank You!</h3></div>
                         )}
                     </div>
                 </div>

@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { ref, onValue, update, remove, push, set } from 'firebase/database';
 // import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { db } from '../../../lib/firebase';
+import { awardXP, incrementAction } from '../../../lib/gamification';
+import { useAuth } from '../../../context/AuthContext';
 import Header from '../../../components/Header';
 import Sidebar from '../../../components/Sidebar';
 import ProtectedRoute from '../../../components/ProtectedRoute';
@@ -49,6 +51,7 @@ interface Project {
 
 export default function ProjectDetailsPage() {
   const params = useParams();
+  const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<'preparation' | 'construction' | 'share'>('preparation');
   
@@ -486,6 +489,13 @@ export default function ProjectDetailsPage() {
         visibility: shareOption === 'community' ? 'public' : 'private',
         final_images: finalImages
       });
+
+      if (user) {
+         // Award XP for completing a project
+         await awardXP(user.uid, 50); // 50 XP for project completion
+         // Increment project count stat
+         await incrementAction(user.uid, 'project', 1);
+      }
       
       alert(`Project successfully ${shareOption === 'community' ? 'shared to community' : 'marked as private'}!`);
       // Optionally redirect or update UI state

@@ -1,0 +1,159 @@
+.container {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  max-width: 1200px;
+  margin: 0 auto;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.mainContent {
+  padding: 30px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+  min-height: 600px;
+  margin-top: 20px;
+}
+
+.title {
+  color: #2e8b57;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.tableContainer {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.table th, .table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.table th {
+  background-color: #f8f9fa;
+  color: #2e8b57;
+  font-weight: 600;
+}
+
+.table tr:hover {
+  background-color: #f9f9f9;
+}
+
+.actionBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 4px;
+  margin-right: 5px;
+  transition: background 0.2s;
+}
+
+.editBtn {
+  color: #2e8b57;
+}
+
+.editBtn:hover {
+  background-color: #e6f4ea;
+}
+
+.deleteBtn {
+  color: #dc3545;
+}
+
+.deleteBtn:hover {
+  background-color: #ffeef0;
+}
+
+/* Modal Styles */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background: white;
+  padding: 30px;
+  border-radius: 16px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.modalTitle {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #2e8b57;
+}
+
+.formGroup {
+  margin-bottom: 15px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #555;
+}
+
+.formGroup input, .formGroup select, .formGroup textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.formGroup textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.cancelBtn {
+  padding: 10px 20px;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  color: black;
+}
+
+.saveBtn {
+  padding: 10px 20px;
+  background: #2e8b57;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.saveBtn:hover {
+  background: #257045;
+}
