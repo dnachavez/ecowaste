@@ -47,12 +47,15 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'in-progress' | 'completed'>('all');
   
-  // UI State
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [feedbackRating, setFeedbackRating] = useState(0);
-  const [feedbackText, setFeedbackText] = useState('');
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
-  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  // Feedback state
+    const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+    const [rating, setRating] = useState(0);
+    const [feedbackText, setFeedbackText] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
+    const [ratingError, setRatingError] = useState(false);
+    const [textError, setTextError] = useState(false);
+
 
   useEffect(() => {
     if (authLoading) return;
@@ -102,22 +105,42 @@ export default function ProjectsPage() {
   };
 
   // Feedback
-  const submitFeedback = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (feedbackRating === 0 || !feedbackText.trim()) return;
-    
-    setIsSubmittingFeedback(true);
-    setTimeout(() => {
-      setIsSubmittingFeedback(false);
-      setFeedbackSubmitted(true);
+const handleFeedbackSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      let valid = true;
+      if (rating === 0) {
+        setRatingError(true);
+        valid = false;
+      } else {
+        setRatingError(false);
+      }
+      
+      if (feedbackText.trim() === '') {
+        setTextError(true);
+        valid = false;
+      } else {
+        setTextError(false);
+      }
+      
+      if (!valid) return;
+      
+      setIsSubmitting(true);
+      
+      // Simulate API call
       setTimeout(() => {
-        setShowFeedbackModal(false);
-        setFeedbackSubmitted(false);
-        setFeedbackRating(0);
-        setFeedbackText('');
-      }, 2000);
-    }, 1500);
-  };
+        setIsSubmitting(false);
+        setSubmitSuccess(true);
+        
+        // Reset and close after 3 seconds
+        setTimeout(() => {
+          setIsFeedbackOpen(false);
+          setSubmitSuccess(false);
+          setRating(0);
+          setFeedbackText('');
+        }, 3000);
+      }, 1500);
+    };
 
   // Filtering
   const filteredProjects = projects.filter(p => {
@@ -214,46 +237,72 @@ export default function ProjectsPage() {
       </main>
 
       {/* Feedback Button */}
-      <div className={styles['feedback-btn']} onClick={() => setShowFeedbackModal(true)}>💬</div>
+      <div className={styles.feedbackBtn} onClick={() => setIsFeedbackOpen(true)}>💬</div>
 
       {/* Feedback Modal */}
-      {showFeedbackModal && (
-        <div className={styles['feedback-modal']} style={{ display: 'flex' }}>
-          <div className={styles['feedback-content']}>
-            <span className={styles['feedback-close-btn']} onClick={() => setShowFeedbackModal(false)}>×</span>
-            {!feedbackSubmitted ? (
-              <form onSubmit={submitFeedback}>
-                <h3 style={{ color: '#82AA52', marginBottom: '20px' }}>Share Your Feedback</h3>
-                
-                <div className={styles['emoji-rating']}>
-                  {[1, 2, 3, 4, 5].map(rating => (
+      {isFeedbackOpen && (
+        <div className={styles.feedbackModal} onClick={(e) => {
+          if (e.target === e.currentTarget) setIsFeedbackOpen(false);
+        }}>
+          <div className={styles.feedbackContent}>
+            <span className={styles.feedbackCloseBtn} onClick={() => setIsFeedbackOpen(false)}>×</span>
+            
+            {!submitSuccess ? (
+              <div className={styles.feedbackForm}>
+                <h3>Share Your Feedback</h3>
+                <div className={styles.emojiRating}>
+                  {[
+                    { r: 1, e: '😞', l: 'Very Sad' },
+                    { r: 2, e: '😕', l: 'Sad' },
+                    { r: 3, e: '😐', l: 'Neutral' },
+                    { r: 4, e: '🙂', l: 'Happy' },
+                    { r: 5, e: '😍', l: 'Very Happy' }
+                  ].map((option) => (
                     <div 
-                      key={rating}
-                      className={`${styles['emoji-option']} ${feedbackRating === rating ? styles.selected : ''}`}
-                      onClick={() => setFeedbackRating(rating)}
+                      key={option.r} 
+                      className={`${styles.emojiOption} ${rating === option.r ? styles.selected : ''}`}
+                      onClick={() => {
+                        setRating(option.r);
+                        setRatingError(false);
+                      }}
                     >
-                      <span className={styles['emoji']}>{['😞', '😕', '😐', '🙂', '😍'][rating-1]}</span>
-                      <span className={styles['emoji-label']}>{['Very Sad', 'Sad', 'Neutral', 'Happy', 'Very Happy'][rating-1]}</span>
+                      <span className={styles.emoji}>{option.e}</span>
+                      <span className={styles.emojiLabel}>{option.l}</span>
                     </div>
                   ))}
                 </div>
+                {ratingError && <div className={styles.errorMessage} style={{display: 'block'}}>Please select a rating</div>}
                 
+                <p className={styles.feedbackDetail}>Please share in detail what we can improve more?</p>
                 <textarea 
-                  id="feedbackText" 
                   placeholder="Your feedback helps us make EcoWaste better..."
                   value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
+                  onChange={(e) => {
+                    setFeedbackText(e.target.value);
+                    setTextError(false);
+                  }}
                 ></textarea>
+                {textError && <div className={styles.errorMessage} style={{display: 'block'}}>Please provide your feedback</div>}
                 
-                <button type="submit" className={styles['feedback-submit-btn']} disabled={isSubmittingFeedback}>
-                  {isSubmittingFeedback ? 'Submitting...' : 'Submit Feedback'}
+                <button 
+                  type="submit" 
+                  className={styles.feedbackSubmitBtn} 
+                  onClick={handleFeedbackSubmit}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      Submitting... <div className={styles.spinner}></div>
+                    </>
+                  ) : 'Submit Feedback'}
                 </button>
-              </form>
+              </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                <span style={{ fontSize: '48px', display: 'block', marginBottom: '15px' }}>🎉</span>
-                <h3 style={{ color: '#82AA52' }}>Thank You!</h3>
-                <p>We appreciate your feedback.</p>
+              <div className={styles.thankYouMessage} style={{display: 'block'}}>
+                <span className={styles.thankYouEmoji}>🎉</span>
+                <h3>Thank You!</h3>
+                <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
+                <p>Your opinion matters to us!</p>
               </div>
             )}
           </div>
