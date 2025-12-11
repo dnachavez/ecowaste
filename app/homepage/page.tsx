@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
@@ -69,7 +69,7 @@ interface FirebaseUser {
     avatar?: string;
 }
 
-export default function Homepage() {
+function HomepageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1133,5 +1133,13 @@ export default function Homepage() {
         </div>
       )}
     </ProtectedRoute>
+  );
+}
+
+export default function Homepage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HomepageContent />
+    </Suspense>
   );
 }
