@@ -3,6 +3,7 @@
   --dark-green: #6d8f45;
   --light-green: #F6FFEB;
   --accent-green: #2e8b57;
+  scrollbar-color: #82AA52 #F6FFEB;
 }
 
 .container {
@@ -11,6 +12,8 @@
   max-width: 1200px;
   margin: 0 auto;
   align-items: flex-start;
+  scrollbar-width: thin;
+  scrollbar-color: #82AA52 #F6FFEB;
 }
 
 .header {
