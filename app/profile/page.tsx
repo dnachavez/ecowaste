@@ -45,7 +45,8 @@ export default function ProfilePage() {
     badges: [] as string[],
     recyclingCount: 0,
     donationCount: 0,
-    projectsCompleted: 0
+    projectsCompleted: 0,
+    equippedBadge: '' as string
   });
 
   useEffect(() => {
@@ -71,7 +72,8 @@ export default function ProfilePage() {
                     badges: data.badges || [],
                     recyclingCount: data.recyclingCount || 0,
                     donationCount: data.donationCount || 0,
-                    projectsCompleted: data.projectsCompleted || 0
+                    projectsCompleted: data.projectsCompleted || 0,
+                    equippedBadge: data.equippedBadge || ''
                 });
             } else {
                  // Initialize from Auth if no DB data
@@ -183,6 +185,19 @@ export default function ProfilePage() {
 
   const hasBadge = (id: string) => stats.badges.includes(id) || stats.badges.includes(id.toUpperCase());
 
+  const handleEquipBadge = async (badgeId: string) => {
+    if (user) {
+      try {
+        const userRef = ref(db, `users/${user.uid}`);
+        const newEquipped = stats.equippedBadge === badgeId ? '' : badgeId;
+        await update(userRef, { equippedBadge: newEquipped });
+        setStats(prev => ({ ...prev, equippedBadge: newEquipped }));
+      } catch (error) {
+        console.error('Error equipping badge:', error);
+      }
+    }
+  };
+
   return (
     <ProtectedRoute>
     <div className={styles.container}>
@@ -278,38 +293,51 @@ export default function ProfilePage() {
             </div>
 
             <div className={styles.badgesGrid}>
-              {/* Main Badges */}
-              <BadgeItem 
-                icon="mountain" 
-                title="Sierra Madre" 
-                desc="Reached Level 5" 
-                progress={stats.level} 
-                total={5} 
-                unlocked={hasBadge('sierra_madre') || stats.level >= 5}
-                customIcon="/sierra_madre_badge.svg"
-              />
-              <BadgeItem 
-                icon="recycle" 
-                title="Eco Warrior" 
-                desc="Recycled 10+ items" 
-                progress={stats.recyclingCount} 
-                total={10} 
-                unlocked={hasBadge('eco_warrior') || stats.recyclingCount >= 10} 
-              />
-              <BadgeItem 
-                icon="hand-holding-heart" 
-                title="Generous Soul" 
-                desc="Donated 5+ items" 
-                progress={stats.donationCount} 
-                total={5} 
-                unlocked={hasBadge('generous_soul') || stats.donationCount >= 5} 
-              />
+              {/* Main Badges - Only show unlocked (excluding secret badge) */}
+              {(hasBadge('eco_warrior') || stats.recyclingCount >= 10) && (
+                <BadgeItem 
+                  icon="recycle" 
+                  title="Eco Warrior" 
+                  desc="Recycled 10+ items" 
+                  badgeId="eco_warrior"
+                  equipped={stats.equippedBadge === 'eco_warrior'}
+                  onEquip={() => handleEquipBadge('eco_warrior')}
+                />
+              )}
+              {(hasBadge('generous_soul') || stats.donationCount >= 5) && (
+                <BadgeItem 
+                  icon="hand-holding-heart" 
+                  title="Generous Soul" 
+                  desc="Donated 5+ items" 
+                  badgeId="generous_soul"
+                  equipped={stats.equippedBadge === 'generous_soul'}
+                  onEquip={() => handleEquipBadge('generous_soul')}
+                />
+              )}
               
-              {/* Additional Badges (Placeholders or Future) */}
+              {/* Additional Badges (Only show if unlocked) */}
               {showAllBadges && (
                 <>
-                  <BadgeItem icon="project-diagram" title="Project Master" desc="Completed 3+ projects" progress={stats.projectsCompleted} total={3} unlocked={stats.projectsCompleted >= 3} />
-                  <BadgeItem icon="star" title="Eco Star" desc="Earned 100 XP" progress={stats.xp} total={100} unlocked={stats.xp >= 100} />
+                  {stats.projectsCompleted >= 3 && (
+                    <BadgeItem 
+                      icon="project-diagram" 
+                      title="Project Master" 
+                      desc="Completed 3+ projects" 
+                      badgeId="project_master"
+                      equipped={stats.equippedBadge === 'project_master'}
+                      onEquip={() => handleEquipBadge('project_master')}
+                    />
+                  )}
+                  {stats.xp >= 100 && (
+                    <BadgeItem 
+                      icon="star" 
+                      title="Eco Star" 
+                      desc="Earned 100 XP" 
+                      badgeId="eco_star"
+                      equipped={stats.equippedBadge === 'eco_star'}
+                      onEquip={() => handleEquipBadge('eco_star')}
+                    />
+                  )}
                 </>
               )}
             </div>
@@ -529,8 +557,8 @@ export default function ProfilePage() {
 }
 
 // Helper component for badges
-function BadgeItem({ icon, title, desc, progress, total, percent, unlocked, customIcon }: { icon: string, title: string, desc: string, progress: number, total: number, percent?: number, unlocked: boolean, customIcon?: string }) {
-  const percentage = percent !== undefined ? percent : Math.min(100, (progress / total) * 100);
+function BadgeItem({ icon, title, desc, badgeId, equipped, onEquip, progress, total, percent, unlocked, customIcon }: { icon: string, title: string, desc: string, badgeId?: string, equipped?: boolean, onEquip?: () => void, progress?: number, total?: number, percent?: number, unlocked?: boolean, customIcon?: string }) {
+  const percentage = percent !== undefined ? percent : (progress !== undefined && total !== undefined ? Math.min(100, (progress / total) * 100) : 100);
   
   return (
     <div className={`${styles.badgeItem} ${!unlocked ? styles.locked : ''}`}>
@@ -543,17 +571,38 @@ function BadgeItem({ icon, title, desc, progress, total, percent, unlocked, cust
       </div>
       <h4>{title}</h4>
       <p>{desc}</p>
-      {unlocked ? (
-           <div style={{color: '#82AA52', fontSize: '12px', fontWeight: 'bold', marginTop: '10px'}}>
-             <i className="fas fa-check-circle"></i> Unlocked
-           </div>
-      ) : (
+      {unlocked === false ? (
         <>
             <div className={styles.badgeProgress}>
                 <div className={styles.progressBar} style={{ width: `${percentage}%` }}></div>
             </div>
             <small>{progress} / {total} completed</small>
         </>
+      ) : (
+           <>
+             <div style={{color: '#82AA52', fontSize: '12px', fontWeight: 'bold', marginTop: '10px', marginBottom: '8px'}}>
+               <i className="fas fa-check-circle"></i> Unlocked
+             </div>
+             {badgeId && onEquip && (
+               <button
+                 onClick={onEquip}
+                 style={{
+                   background: equipped ? '#82AA52' : '#ddd',
+                   color: equipped ? 'white' : '#333',
+                   border: 'none',
+                   padding: '6px 12px',
+                   borderRadius: '4px',
+                   fontSize: '12px',
+                   fontWeight: '600',
+                   cursor: 'pointer',
+                   width: '100%',
+                   transition: 'all 0.3s'
+                 }}
+               >
+                 {equipped ? '✓ Equipped' : 'Equip Badge'}
+               </button>
+             )}
+           </>
       )}
     </div>
   );

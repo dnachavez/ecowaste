@@ -75,18 +75,28 @@ export default function CreateTaskPage() {
       return;
     }
 
+    console.log('handleCreateBadge called', newBadge);
+    setError('');
+
     try {
-      const badgesRef = ref(db, 'badges');
-      const newBadgeRef = await push(badgesRef, {
-        name: newBadge.name,
-        description: newBadge.description,
-        icon: newBadge.icon,
-        createdAt: Date.now()
+      const response = await fetch('/api/create-badge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newBadge)
       });
 
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('create-badge response error', data);
+        setError(data.error || 'Failed to create badge');
+        return;
+      }
+
+      console.log('create-badge success', data);
       setFormData(prev => ({
         ...prev,
-        badgeId: newBadgeRef.key || ''
+        badgeId: data.badgeId || ''
       }));
       setNewBadge({ name: '', description: '', icon: '⭐' });
       setShowCreateBadge(false);

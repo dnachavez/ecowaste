@@ -17,6 +17,7 @@ export default function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [equippedBadge, setEquippedBadge] = useState<string>('');
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -47,6 +48,42 @@ export default function Header() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // Fetch equipped badge
+  useEffect(() => {
+    if (!user) return;
+
+    const userRef = ref(db, `users/${user.uid}`);
+    const unsubscribe = onValue(userRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data && data.equippedBadge) {
+        setEquippedBadge(data.equippedBadge);
+      } else {
+        setEquippedBadge('');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Fetch badge icon
+  const [badgeIcon, setBadgeIcon] = useState<string>('');
+  useEffect(() => {
+    if (!equippedBadge) {
+      setBadgeIcon('');
+      return;
+    }
+
+    const badgeRef = ref(db, `badges/${equippedBadge}`);
+    const unsubscribe = onValue(badgeRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data && data.icon) {
+        setBadgeIcon(data.icon);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [equippedBadge]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -186,7 +223,10 @@ export default function Header() {
               user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'
             )}
           </div>
-          <span className={styles.profileName}>{user.displayName || 'User'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {badgeIcon && <span style={{ fontSize: '18px' }}>{badgeIcon}</span>}
+            <span className={styles.profileName}>{user.displayName || 'User'}</span>
+          </div>
           <i className={`fas fa-chevron-down ${styles.dropdownArrow} ${showProfileDropdown ? styles.rotate : ''}`}></i>
           {showProfileDropdown && (
             <div className={styles.profileDropdown}>

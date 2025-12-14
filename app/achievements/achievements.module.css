@@ -710,3 +710,28 @@
         text-align: center;
     }
 }
+/* Task List Scrolling */
+.taskList {
+    max-height: 400px;
+    overflow-y: auto;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.taskList::-webkit-scrollbar {
+    width: 8px;
+}
+
+.taskList::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 8px;
+}
+
+.taskList::-webkit-scrollbar-thumb {
+    background: #82AA52;
+    border-radius: 8px;
+}
+
+.taskList::-webkit-scrollbar-thumb:hover {
+    background: #6b9142;
+}

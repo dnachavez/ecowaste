@@ -10,12 +10,15 @@ import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebase';
 import { ref, onValue, update, get } from 'firebase/database';
 import { awardXP, getNextLevelXp, incrementAction } from '../../lib/gamification';
+import { createNotification } from '../../lib/notifications';
 
 interface Task {
     id: string;
     title: string;
     description: string;
-    xpReward: number;
+    xpReward?: number;
+    badgeId?: string;
+    rewardType?: 'xp' | 'badge';
     type: 'recycle' | 'donate' | 'other';
     target?: number;
     pickupDate?: string;
@@ -105,32 +108,96 @@ export default function Achievements() {
         if (!user) return;
         
         try {
+            // Handle badge rewards
+            let xpToAward = task.rewardType === 'badge' ? 0 : (task.xpReward || 50);
+            let badgeToAward = task.rewardType === 'badge' ? task.badgeId : null;
+
             // Logic based on task type
             if (task.type === 'recycle') {
-                // For recycling, claiming the task IS the action (logging the recycle)
-                // We increment the count and award the task's XP
-                await incrementAction(user.uid, 'recycle', task.target || 1, task.xpReward);
+                if (task.rewardType === 'badge') {
+                    // For badge rewards, just award the badge
+                    const newBadges = [...stats.badges];
+                    if (badgeToAward && !newBadges.includes(badgeToAward)) {
+                        newBadges.push(badgeToAward);
+                    }
+                    await update(ref(db, `users/${user.uid}`), {
+                        badges: newBadges,
+                        completedTasks: [...completedTasks, task.id]
+                    });
+                } else {
+                    await incrementAction(user.uid, 'recycle', task.target || 1, xpToAward);
+                    await update(ref(db, `users/${user.uid}`), {
+                        completedTasks: [...completedTasks, task.id]
+                    });
+                }
             } else if (task.type === 'donate') {
-                 // For donations, we verify they have reached the milestone
-                 // Because donations are tracked via the donation system
-                 if (task.target && stats.donationCount < task.target) {
+                if (task.target && stats.donationCount < task.target) {
                     alert(`You need to donate ${task.target - stats.donationCount} more items to claim this reward!`);
                     return;
                 }
-                // If verified, we award the XP (bonus) but do NOT increment count (already done)
-                await awardXP(user.uid, task.xpReward);
+                if (task.rewardType === 'badge') {
+                    const newBadges = [...stats.badges];
+                    if (badgeToAward && !newBadges.includes(badgeToAward)) {
+                        newBadges.push(badgeToAward);
+                    }
+                    await update(ref(db, `users/${user.uid}`), {
+                        badges: newBadges,
+                        completedTasks: [...completedTasks, task.id]
+                    });
+                } else {
+                    await awardXP(user.uid, xpToAward);
+                    await update(ref(db, `users/${user.uid}`), {
+                        completedTasks: [...completedTasks, task.id]
+                    });
+                }
             } else {
-                // For other tasks, just award XP
-                await awardXP(user.uid, task.xpReward);
+                // For other tasks
+                if (task.rewardType === 'badge') {
+                    const newBadges = [...stats.badges];
+                    if (badgeToAward && !newBadges.includes(badgeToAward)) {
+                        newBadges.push(badgeToAward);
+                    }
+                    await update(ref(db, `users/${user.uid}`), {
+                        badges: newBadges,
+                        completedTasks: [...completedTasks, task.id]
+                    });
+                } else {
+                    await awardXP(user.uid, xpToAward);
+                    await update(ref(db, `users/${user.uid}`), {
+                        completedTasks: [...completedTasks, task.id]
+                    });
+                }
             }
 
-            // Update completed tasks
+            // Check if all tasks are completed for secret achievement
             const newCompleted = [...completedTasks, task.id];
-            await update(ref(db, `users/${user.uid}`), {
-                completedTasks: newCompleted
-            });
-            
-            alert(`Task Completed! You earned ${task.xpReward} XP.`);
+            if (newCompleted.length === tasks.length && tasks.length > 0) {
+                // All tasks completed - award secret badge via notification
+                const { createNotification } = await import('../../lib/notifications');
+                
+                // Award the badge
+                const userRef = ref(db, `users/${user.uid}`);
+                const currentData = (await import('firebase/database').then(m => m.get(userRef))).val();
+                const newBadges = currentData?.badges || [];
+                if (!newBadges.includes('sierra_madre')) {
+                    newBadges.push('sierra_madre');
+                }
+                
+                await update(userRef, {
+                    badges: newBadges
+                });
+
+                // Send notification about secret achievement
+                await createNotification(user.uid, {
+                    title: '🎉 Secret Achievement Unlocked!',
+                    message: '👑 Sierra Madre - You completed all tasks! A legendary badge has been awarded.',
+                    type: 'success'
+                });
+
+                alert(`Task Completed! ${task.rewardType === 'badge' ? 'Badge awarded!' : `You earned ${task.xpReward} XP.`}\n\n🎉 Secret Achievement Unlocked: Sierra Madre Badge!`);
+            } else {
+                alert(`Task Completed! ${task.rewardType === 'badge' ? 'Badge awarded!' : `You earned ${task.xpReward} XP.`}`);
+            }
         } catch (error) {
             console.error('Error completing task:', error);
             alert('Something went wrong. Please try again.');
@@ -158,6 +225,7 @@ export default function Achievements() {
             <div className={styles.taskList}>
                 {list.map(task => {
                     const isCompleted = completedTasks.includes(task.id);
+                    const isBadgeReward = task.rewardType === 'badge';
                     return (
                         <div key={task.id} className={styles.taskItem} style={{
                             padding: '15px', 
@@ -176,7 +244,9 @@ export default function Achievements() {
                                         {task.deliveryDate && <span>Delivery: {task.deliveryDate}</span>}
                                     </div>
                                 )}
-                                <span style={{fontSize: '12px', color: '#82AA52', fontWeight: 'bold'}}>+{task.xpReward} XP</span>
+                                <span style={{fontSize: '12px', color: '#82AA52', fontWeight: 'bold'}}>
+                                    {isBadgeReward ? '🎖️ Badge Reward' : `+${task.xpReward || 50} XP`}
+                                </span>
                             </div>
                             {isCompleted ? (
                                 <span style={{color: '#82AA52', fontWeight: 'bold'}}>Completed ✓</span>
