@@ -168,8 +168,9 @@ const handleFeedbackSubmit = (e: React.FormEvent) => {
 
   return (
     <ProtectedRoute>
-    <div className={styles.container}>
       <Header />
+
+      <div className={styles.container}>
       <Sidebar />
 
       {/* Main Content */}

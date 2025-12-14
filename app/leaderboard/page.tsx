@@ -207,8 +207,9 @@ export default function Leaderboard() {
 
   return (
     <ProtectedRoute>
-    <div className={styles.container}>
       <Header />
+
+      <div className={styles.container}>
       <Sidebar />
 
       <main className={styles.mainContent}>

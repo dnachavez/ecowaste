@@ -363,8 +363,8 @@ function BrowseContent() {
 
   return (
     <ProtectedRoute>
-    <div className={styles.container}>
       <Header />
+      <div className={styles.container}>
       <Sidebar />
 
       {/* Main Content */}

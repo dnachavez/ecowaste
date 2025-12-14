@@ -227,8 +227,8 @@ export default function Achievements() {
     return (
         <ProtectedRoute>
         <div className={styles.pageWrapper}>
-        <div className={styles.container}>
             <Header />
+            <div className={styles.container}>
             <Sidebar />
 
             <main className={styles.mainContent}>
