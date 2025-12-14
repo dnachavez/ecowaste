@@ -10,7 +10,6 @@
   grid-template-columns: 250px minmax(600px, 900px);
   max-width: 1200px;
   margin: 0 auto;
-  gap: 20px;
   align-items: flex-start;
 }
 

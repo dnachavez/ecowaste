@@ -155,8 +155,9 @@ export default function CreateTaskPage() {
 
   return (
     <AdminRoute>
-        <div className={styles.container}>
             <Header />
+
+            <div className={styles.container}>
             <AdminSidebar />
             <main className={styles.mainContent}>
                 <h1 className={styles.title}>Create New Task</h1>

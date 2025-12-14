@@ -633,9 +633,9 @@ function HomepageContent() {
 
   return (
     <ProtectedRoute>
-    <div className={styles.container}>
       {/* Load Font Awesome */}
       <Header />
+      <div className={styles.container}>
       <Sidebar />
 
       <main className={styles.mainContent}>

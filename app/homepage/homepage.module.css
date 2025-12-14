@@ -3,6 +3,7 @@
   --dark-green: #6d8f45;
   --light-green: #F6FFEB;
   --accent-green: #2e8b57;
+  scrollbar-color: #82AA52 #F6FFEB;
 }
 
 .container {
@@ -10,8 +11,9 @@
   grid-template-columns: 250px 1fr 300px;
   max-width: 1200px;
   margin: 0 auto;
-  gap: 20px;
   align-items: flex-start;
+  scrollbar-width: thin;
+  scrollbar-color: #82AA52 #F6FFEB;
 }
 
 .header {

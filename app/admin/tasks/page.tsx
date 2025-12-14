@@ -152,8 +152,9 @@ export default function TasksManagement() {
 
   return (
     <AdminRoute>
-      <div className={styles.container}>
         <Header />
+
+        <div className={styles.container}>
         <AdminSidebar />
         <main className={styles.mainContent}>
           <div className={styles.pageHeader}>

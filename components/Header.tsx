@@ -164,7 +164,7 @@ export default function Header() {
         <div className={styles.logo}>
           <img src="/ecowaste_logo.png" alt="EcoWaste Logo" />
         </div>
-        <h1 style={{ fontFamily: 'var(--font-montserrat), sans-serif', fontWeight: 900, fontSize: '24px' }}>EcoWaste</h1>
+        <h1 style={{ fontFamily: "'Georgia', serif", fontWeight: 900, fontSize: '24px' }}>EcoWaste</h1>
       </div>
       <div className={styles.rightSection}>
         <div className={styles.notificationContainer} ref={notificationRef}>

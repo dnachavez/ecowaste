@@ -94,8 +94,9 @@ export default function DonationsManagement() {
 
   return (
     <AdminRoute>
-      <div className={styles.container}>
         <Header />
+        
+        <div className={styles.container}>
         <AdminSidebar />
         <main className={styles.mainContent}>
           <h1 className={styles.title}>Manage Donations</h1>

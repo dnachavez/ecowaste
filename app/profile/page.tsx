@@ -200,8 +200,9 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-    <div className={styles.container}>
       <Header />
+
+      <div className={styles.container}>
       <Sidebar />
       <main className={styles.mainContent}>
           {/* Back navigation and page title */}
