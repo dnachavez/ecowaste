@@ -29,7 +29,7 @@ export default function LoginPage() {
   };
 
   const handleFacebookClick = () => {
-    showPopupToast('Facebook authentication coming soon!');
+    // Facebook auth removed
   };
 
   const showPopupToast = (message: string) => {
@@ -163,14 +163,7 @@ export default function LoginPage() {
                 >
                     <i className="fab fa-google"></i> Continue with Google
                 </button>
-                <button 
-                    type="button" 
-                    className={`${styles.socialBtn} ${styles.socialBtnFacebook}`} 
-                    id="facebookBtn"
-                    onClick={handleFacebookClick}
-                > 
-                    <i className="fab fa-facebook-f"></i> (Coming Soon)
-                </button>
+                
               </div>
               
               <p className={styles.signupLink}>Don&apos;t have an account? <Link href="/signup">Sign up</Link></p>

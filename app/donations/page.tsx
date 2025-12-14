@@ -45,6 +45,8 @@ interface Request {
   deliveryStatus?: string;
   estimatedDeliveryDate?: string;
   estimatedPickupDate?: string;
+  pickupDate?: string;
+  deliveryDate?: string;
   processingDate?: string;
   deliveredDate?: string;
   cancelledDate?: string;
@@ -145,24 +147,40 @@ export default function DonationsPage() {
     const unsubscribeRequestsForMe = onValue(requestsForMeQuery, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const loadedRequests = Object.entries(data).map(([key, value]) => {
-           const req = {
-             id: key,
-             ...(value as Omit<Request, 'id'>)
-           } as Request;
+                const loadedRequests = Object.entries(data).map(([key, value]) => ({
+                     id: key,
+                     ...(value as Omit<Request, 'id'>)
+                } as Request));
 
-           // Backfill Project Title if missing
-           if (req.projectId && !req.projectTitle) {
-               get(ref(db, `projects/${req.projectId}`)).then((snap) => {
-                   if (snap.exists()) {
-                       update(ref(db, `requests/${key}`), { projectTitle: snap.val().title });
-                   }
-               });
-           }
+                // Resolve requester names by reading users/{requesterId} and backfill the requests if needed
+                (async () => {
+                    const resolved = await Promise.all(loadedRequests.map(async (req) => {
+                        try {
+                            if (req.requesterId) {
+                                const userSnap = await get(ref(db, `users/${req.requesterId}`));
+                                if (userSnap.exists()) {
+                                    const userData = userSnap.val();
+                                    const preferredName = userData.fullName || userData.displayName || userData.userName || userData.name || '';
+                                    if (preferredName && preferredName !== req.requesterName) {
+                                        // Update the requests node so future reads have the correct name
+                                        try {
+                                            await update(ref(db, `requests/${req.id}`), { requesterName: preferredName });
+                                            req.requesterName = preferredName;
+                                        } catch (e) {
+                                            // If update fails, still set locally so UI shows correct name
+                                            req.requesterName = preferredName;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Failed to resolve requester name for request', req.id, e);
+                        }
+                        return req;
+                    }));
 
-           return req;
-        });
-        setRequestsForMe(loadedRequests.reverse());
+                    setRequestsForMe(resolved.reverse());
+                })();
       } else {
         setRequestsForMe([]);
       }
@@ -205,40 +223,115 @@ export default function DonationsPage() {
   }, [user]);
 
   const handleUpdateStatus = async (request: Request, newStatus: string) => {
+    console.log('[APPROVAL] Starting approval process for request:', { requestId: request.id, newStatus, donationId: request.donationId, projectId: request.projectId });
     if (newStatus === 'approved') {
         const donationRef = ref(db, `donations/${request.donationId}`);
-        
+        const qtyToSubtract = Number(request.quantity) || 0;
+
+        // Try safe transaction first, fallback to single-get+update if transaction fails.
         try {
-            await runTransaction(donationRef, (currentDonation) => {
+            const donationTxResult = await runTransaction(donationRef, (currentDonation) => {
                 if (currentDonation) {
-                    const currentQty = parseFloat(currentDonation.quantity);
-                    if (!isNaN(currentQty)) {
-                         const newQty = currentQty - request.quantity;
-                         currentDonation.quantity = newQty.toString();
-                    }
+                    const currentQty = Number(currentDonation.quantity) || 0;
+                    const newQty = currentQty - qtyToSubtract;
+                    currentDonation.quantity = newQty.toString();
                 }
                 return currentDonation;
             });
-            
-             const requestRef = ref(db, `requests/${request.id}`);
-             await update(requestRef, { 
-                 status: newStatus,
-                 deliveryStatus: 'Pending Item',
-                 processingDate: new Date().toISOString()
-             });
-
-             await createNotification(
-                 request.requesterId,
-                 'Request Approved',
-                 `Your request for "${request.donationTitle}" has been approved!`,
-                 'success',
-                 request.id
-             );
-
-        } catch (error) {
-            console.error("Error updating donation quantity:", error);
-            alert("Failed to update donation quantity. Please try again.");
+            console.log('[DONATION_UPDATE] runTransaction result:', { committed: donationTxResult?.committed, value: donationTxResult?.snapshot?.val() });
+        } catch (txErr) {
+            console.error('[DONATION_UPDATE] runTransaction failed, attempting fallback update:', txErr);
+            try {
+                const snap = await get(donationRef);
+                if (snap.exists()) {
+                    const currentQty = Number(snap.val().quantity) || 0;
+                    const newQty = currentQty - qtyToSubtract;
+                    await update(donationRef, { quantity: newQty.toString() });
+                } else {
+                    console.warn('Donation not found for fallback:', request.donationId);
+                }
+            } catch (fallbackErr) {
+                console.error('Fallback donation update failed:', fallbackErr);
+            }
         }
+
+        // Proceed to update request status even if donation quantity update had issues
+        const requestRef = ref(db, `requests/${request.id}`);
+        try {
+          await update(requestRef, {
+            status: newStatus,
+            deliveryStatus: 'Pending Item',
+            processingDate: new Date().toISOString()
+          });
+        } catch (err) {
+          console.error('Failed to update request status after approval:', err);
+        }
+
+             // Update project material acquired amount when request is approved
+             if (request.projectId && request.quantity) {
+                 console.log('[MATERIAL_UPDATE] Starting material update for request:', { projectId: request.projectId, quantity: request.quantity, donationTitle: request.donationTitle });
+                 try {
+                     const projectRef = ref(db, `projects/${request.projectId}`);
+                     const projectSnap = await get(projectRef);
+                     const snapshot = projectSnap.val();
+                     console.log('[MATERIAL_UPDATE] Fetched project snapshot:', { exists: !!snapshot, hasMaterials: !!(snapshot && snapshot.materials) });
+
+                     if (snapshot && snapshot.materials) {
+                         const materials = snapshot.materials;
+                         console.log('[MATERIAL_UPDATE] Available materials:', Object.keys(materials).length);
+                         for (const materialId in materials) {
+                             const material = materials[materialId];
+                             const matName = (material.name || '').toString().toLowerCase();
+                             const reqTitle = (request.donationTitle || '').toString().toLowerCase();
+                             console.log('[MATERIAL_UPDATE] Checking material match:', { materialId, matName, reqTitle, nameIncludes: matName.includes(reqTitle), reqIncludes: reqTitle.includes(matName) });
+                             if (matName.includes(reqTitle) || reqTitle.includes(matName)) {
+                                 console.log('[MATERIAL_UPDATE] Material matched! Starting transaction for materialId:', materialId);
+                                 const materialAcquiredRef = ref(db, `projects/${request.projectId}/materials/${materialId}/acquired`);
+                                 const added = Number(request.quantity) || 0;
+                                 console.log('[MATERIAL_UPDATE] Transaction details:', { path: `projects/${request.projectId}/materials/${materialId}/acquired`, adding: added });
+                                 try {
+                                     const materialTxResult = await runTransaction(materialAcquiredRef, (current) => {
+                                         const cur = Number(current) || 0;
+                                         const newVal = cur + added;
+                                         console.log('[MATERIAL_UPDATE] Transaction executing:', { currentValue: cur, adding: added, newValue: newVal });
+                                         return newVal;
+                                     });
+                                     console.log('[MATERIAL_UPDATE] Transaction completed successfully for materialId:', materialId, { committed: materialTxResult?.committed, newVal: materialTxResult?.snapshot?.val() });
+                                 } catch (txErr) {
+                                     console.error('[MATERIAL_UPDATE] Failed to transactionally update material acquired:', txErr);
+                                     // Fallback: attempt a single-shot update
+                                     try {
+                                         const matSnap = await get(ref(db, `projects/${request.projectId}/materials/${materialId}/acquired`));
+                                         const cur = matSnap.exists() ? Number(matSnap.val()) || 0 : 0;
+                                         console.log('[MATERIAL_UPDATE] Fallback: current value before update:', cur);
+                                         await update(ref(db, `projects/${request.projectId}/materials/${materialId}`), { acquired: cur + added });
+                                         console.log('[MATERIAL_UPDATE] Fallback update completed');
+                                     } catch (fallbackErr) {
+                                         console.error('[MATERIAL_UPDATE] Fallback update for material acquired failed:', fallbackErr);
+                                     }
+                                 }
+                                 break;
+                             }
+                         }
+                     }
+                 } catch (err) {
+                     console.error('[MATERIAL_UPDATE] Failed to update project material after approval:', err);
+                     // don't throw — donation approval should still succeed even if project update fails
+                 }
+                         }
+
+                         try {
+                             await createNotification(
+                                 request.requesterId,
+                                 'Request Approved',
+                                 `Your request for "${request.donationTitle}" has been approved!`,
+                                 'success',
+                                 request.id
+                             );
+                             console.log('[APPROVAL] Notification sent successfully for request:', request.id);
+                        } catch (nErr) {
+                            console.error('[APPROVAL] Failed to create approval notification:', nErr);
+                        }
     } else {
         const requestRef = ref(db, `requests/${request.id}`);
         update(requestRef, { status: newStatus })
@@ -499,9 +592,14 @@ export default function DonationsPage() {
                                                     <div className={styles['info-item']} style={{marginBottom: '5px'}}>
                                                         <strong>Delivery Status:</strong> {request.deliveryStatus || 'Pending'}
                                                     </div>
-                                                    {request.estimatedDeliveryDate && (
+                                                    {(request.pickupDate || request.estimatedPickupDate) && (
+                                                        <div className={styles['info-item']} style={{marginBottom: '5px'}}>
+                                                            <strong>Pickup Date:</strong> {new Date(request.pickupDate || request.estimatedPickupDate || '').toLocaleDateString()}
+                                                        </div>
+                                                    )}
+                                                    {(request.deliveryDate || request.estimatedDeliveryDate) && (
                                                         <div className={styles['info-item']}>
-                                                            <strong>Est. Delivery:</strong> {new Date(request.estimatedDeliveryDate).toLocaleDateString()}
+                                                            <strong>Delivery Date:</strong> {new Date(request.deliveryDate || request.estimatedDeliveryDate || '').toLocaleDateString()}
                                                         </div>
                                                     )}
                                                 </div>
@@ -533,13 +631,7 @@ export default function DonationsPage() {
                                                     View Status
                                                  </button>
                                             )}
-                                            <button 
-                                                className={styles['btn-reject']} // Reusing reject style (usually red) or maybe create a delete style
-                                                style={{backgroundColor: '#d32f2f', marginLeft: '5px'}}
-                                                onClick={() => handleDeleteRequest(request.id)}
-                                            >
-                                                <i className="fas fa-trash"></i>
-                                            </button>
+                                            {/* delete button removed per UX request */}
                                         </div>
                                     </div>
                                 ))}
@@ -598,9 +690,14 @@ export default function DonationsPage() {
                                             </div>
                                             {(request.status === 'approved' || request.status === 'completed') && (
                                                 <div className={styles['delivery-info']} style={{marginTop: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px'}}>
-                                                    <div className={styles['info-item']}>
+                                                    <div className={styles['info-item']} style={{marginBottom: '5px'}}>
                                                         <strong>Delivery Status:</strong> {request.deliveryStatus || 'Pending'}
                                                     </div>
+                                                    {(request.deliveryDate || request.estimatedDeliveryDate) && (
+                                                        <div className={styles['info-item']}>
+                                                            <strong>Delivery Date:</strong> {new Date(request.deliveryDate || request.estimatedDeliveryDate || '').toLocaleDateString()}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

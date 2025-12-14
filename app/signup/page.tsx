@@ -362,14 +362,7 @@ function SignupContent() {
               >
                 <i className="fab fa-google"></i> Sign up with Google
               </button>
-              <button 
-                type="button" 
-                className={`${styles.socialBtn} ${styles.facebook}`} 
-                id="facebookBtnSignup"
-                onClick={() => showPopupToast('Facebook authentication coming soon!')}
-              >
-                <i className="fab fa-facebook-f"></i> (Coming Soon)
-              </button>
+              
             </div>
 
             <p className={styles.loginLink}>Already have an account? <Link href="/login">Log in</Link></p>

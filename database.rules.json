@@ -25,6 +25,11 @@
       ".read": "auth != null",
       ".write": "auth != null",
       ".indexOn": ["requesterId", "ownerId", "donationId"]
+    },
+    "notifications": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "createdAt"]
     }
   }
 }

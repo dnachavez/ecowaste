@@ -258,14 +258,6 @@
     background: rgba(219, 68, 55, 0.1);
 }
 
-.socialBtn.facebook {
-    color: #4267B2;
-    border-color: #4267B2;
-}
-
-.socialBtn.facebook:hover {
-    background: rgba(66, 103, 178, 0.1);
-}
 
 .socialBtn i {
     font-size: 1.1rem;

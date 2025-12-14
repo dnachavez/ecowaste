@@ -801,6 +801,14 @@
     display: none;
 }
 
+/* Utility classes */
+.show {
+    display: block;
+}
+
+.muted {
+    color: #666;
+}
 /* Loading spinner */
 .spinner {
     display: inline-block;

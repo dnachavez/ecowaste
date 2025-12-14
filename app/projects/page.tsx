@@ -67,7 +67,23 @@ export default function ProjectsPage() {
       const unsubscribe = onValue(userProjectsQuery, (snapshot) => {
         if (snapshot.exists()) {
           const projectsData = snapshot.val();
-          const projectsList = Object.values(projectsData) as Project[];
+          const projectsList = Object.entries(projectsData).map(([key, value]: [string, any]) => {
+            const project = value as any;
+            // Convert materials from object to array if needed
+            const materialsList = project.materials
+              ? Array.isArray(project.materials)
+                ? project.materials
+                : Object.entries(project.materials).map(([mKey, mValue]: [string, any]) => ({
+                    id: mKey,
+                    ...mValue
+                  }))
+              : [];
+            return {
+              ...project,
+              id: key,
+              materials: materialsList
+            };
+          });
           // Sort by createdAt descending
           projectsList.sort((a, b) => b.createdAt - a.createdAt);
           setProjects(projectsList);
@@ -226,10 +242,10 @@ const handleFeedbackSubmit = (e: React.FormEvent) => {
                 </div>
               ))
             ) : (
-              <div className={styles['empty-state']}>
+                <div className={styles['empty-state']}>
                 <i className="fas fa-check-circle"></i>
                 <p><b>No Projects Found</b></p>
-                <p style={{ color: '#666' }}>Start a new recycling project today!</p>
+                <p className={styles.muted}>Start a new recycling project today!</p>
               </div>
             )}
           </div>
@@ -271,7 +287,7 @@ const handleFeedbackSubmit = (e: React.FormEvent) => {
                     </div>
                   ))}
                 </div>
-                {ratingError && <div className={styles.errorMessage} style={{display: 'block'}}>Please select a rating</div>}
+                {ratingError && <div className={`${styles.errorMessage} ${styles.show}`}>Please select a rating</div>}
                 
                 <p className={styles.feedbackDetail}>Please share in detail what we can improve more?</p>
                 <textarea 
@@ -282,7 +298,7 @@ const handleFeedbackSubmit = (e: React.FormEvent) => {
                     setTextError(false);
                   }}
                 ></textarea>
-                {textError && <div className={styles.errorMessage} style={{display: 'block'}}>Please provide your feedback</div>}
+                {textError && <div className={`${styles.errorMessage} ${styles.show}`}>Please provide your feedback</div>}
                 
                 <button 
                   type="submit" 
@@ -298,7 +314,7 @@ const handleFeedbackSubmit = (e: React.FormEvent) => {
                 </button>
               </div>
             ) : (
-              <div className={styles.thankYouMessage} style={{display: 'block'}}>
+              <div className={`${styles.thankYouMessage} ${styles.show}`}>
                 <span className={styles.thankYouEmoji}>🎉</span>
                 <h3>Thank You!</h3>
                 <p>We appreciate your feedback and will use it to improve EcoWaste.</p>

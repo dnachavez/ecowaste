@@ -369,6 +369,29 @@ function BrowseContent() {
 
       {/* Main Content */}
       <main className={styles.mainContent}>
+        <div style={{ marginBottom: '20px' }}>
+          <button 
+            onClick={() => router.back()}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              backgroundColor: '#2e8b57',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '16px',
+              transition: 'background-color 0.3s'
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1d5a3d')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2e8b57')}
+          >
+            <i className="fas fa-arrow-left"></i> Back to project
+          </button>
+        </div>
         <div className={styles.searchBar}>
             <form onSubmit={(e) => e.preventDefault()}>
                 <input 
