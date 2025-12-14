@@ -100,8 +100,9 @@ export default function ProjectsManagement() {
 
   return (
     <AdminRoute>
-      <div className={styles.container}>
         <Header />
+
+        <div className={styles.container}>
         <AdminSidebar />
         <main className={styles.mainContent}>
           <h1 className={styles.title}>Manage Projects</h1>
