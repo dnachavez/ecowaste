@@ -75,8 +75,9 @@ export default function LearnMorePage() {
             <button className={styles.backBtn} onClick={handleBack}>
               <i className="fas fa-arrow-left"></i> Back
             </button>
-            <h2 className={styles.pageTitle}>Learn More About EcoWaste</h2>
+            <h2 className={styles.pageTitle}>Eco Education Center</h2>
           </div>
+            <p>Learn about Recycling Benefits, Waste Impacts, Sustainable Living, and About EcoWaste.</p>
 
           <div className={styles.tabsContainer}>
             <div className={styles.tabs}>
