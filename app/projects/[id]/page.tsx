@@ -904,8 +904,10 @@ export default function ProjectDetailsPage() {
 
         if (materialsList.length > 0) {
           totalRecycledItems = materialsList.reduce((acc: number, mat: any) => {
-            const qty = parseInt(mat.quantity);
-            return acc + (isNaN(qty) ? 0 : qty);
+            // Use acquired (actual amount) or needed (target amount)
+            // Fallback to 0 if neither exists
+            const qty = mat.acquired || mat.needed || 0;
+            return acc + (typeof qty === 'number' ? qty : parseInt(qty) || 0);
           }, 0);
         }
 

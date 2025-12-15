@@ -17,28 +17,56 @@ export default function TasksManagement() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch tasks & badges
-    const fetchContent = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    let unsubscribeTasks: (() => void) | undefined;
+    let unsubscribeBadges: (() => void) | undefined;
+
+    const setupListeners = async () => {
       try {
-        const { ref, get } = await import('firebase/database');
+        const { ref, onValue } = await import('firebase/database');
 
-        // Tasks
-        const tasksSnapshot = await get(ref(db, 'tasks'));
-        if (tasksSnapshot.exists()) {
-          const tasksList = Object.entries(tasksSnapshot.val()).map(([key, val]: [string, any]) => ({
-            id: key,
-            ...val
-          }));
-          setTasks(tasksList);
-        } else {
-          setTasks([]);
-        }
+        // Tasks listener
+        const tasksRef = ref(db, 'tasks');
+        unsubscribeTasks = onValue(tasksRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const rawData = snapshot.val();
+            // console.log("Tasks raw data:", rawData); // Debug log
+            const tasksList = Object.entries(rawData).map(([key, val]: [string, any]) => ({
+              id: key,
+              ...val
+            }));
+            setTasks(tasksList);
+          } else {
+            console.log("No tasks found in DB");
+            setTasks([]);
+          }
+          setLoading(false); // Set loading to false after tasks are fetched
+        }, (error) => {
+          console.error("Error fetching tasks:", error);
+          setLoading(false);
+        });
 
-        // Badges (optional if we need them separately, but typically tasks handle definition)
-        // Let's just assume we load tasks for now. 
-        // If badges collection exists:
-        // const badgesSnapshot = await get(ref(db, 'badges'));
-        // ...
+        // Badges listener
+        const badgesRef = ref(db, 'badges');
+        unsubscribeBadges = onValue(badgesRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const badgesList = Object.entries(snapshot.val()).map(([key, val]: [string, any]) => ({
+              id: key,
+              ...val
+            }));
+            setBadges(badgesList);
+          } else {
+            setBadges([]);
+          }
+        }, (error) => {
+          console.error("Error fetching badges:", error);
+        });
+
       } catch (error) {
         console.error("Error fetching tasks:", error);
       } finally {
@@ -46,14 +74,13 @@ export default function TasksManagement() {
       }
     };
 
-    if (user) {
-      fetchContent();
-    }
+    if (user) { setupListeners(); }
   }, [user]);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentTask, setCurrentTask] = useState<any>(null);
   const [showCreateBadge, setShowCreateBadge] = useState(false);
+  const [newBadge, setNewBadge] = useState({ name: '', description: '', icon: '⭐' });
 
   const handleEditClick = (task: any) => {
     setCurrentTask(task);
@@ -63,7 +90,7 @@ export default function TasksManagement() {
   const handleDeleteTask = async (taskId: string) => {
     if (!confirm('Are you sure you want to delete this task?')) return;
     try {
-      const { ref, remove } = await import('firebase/database');
+      const { ref, remove, set } = await import('firebase/database');
       await remove(ref(db, `tasks/${taskId}`));
       alert('Task deleted');
     } catch (e) {
@@ -86,18 +113,24 @@ export default function TasksManagement() {
     }
   };
 
-  const handleSeedTasks = async () => {
-    if (!confirm('This will RESET all tasks to the default set. Are you sure?')) return;
-    setLoading(true);
-    try {
-      const message = await seedBadges();
-      alert(message);
-    } catch (error) {
-      console.error('Seed error:', error);
-      alert('Failed to seed tasks.');
+  const handleCreateBadge = async () => {
+    if (!newBadge.name || !newBadge.description || !newBadge.icon) {
+      alert('Please fill in all badge fields.');
+      return;
     }
-    setLoading(false);
+    try {
+      const { ref, push } = await import('firebase/database');
+      const newBadgeRef = push(ref(db, 'badges'));
+      await set(newBadgeRef, newBadge);
+      alert('Badge created successfully!');
+      setNewBadge({ name: '', description: '', icon: '⭐' });
+      setShowCreateBadge(false);
+    } catch (error) {
+      console.error('Error creating badge:', error);
+      alert('Failed to create badge.');
+    }
   };
+
 
   return (
     <AdminRoute>
@@ -109,13 +142,6 @@ export default function TasksManagement() {
           <div className={styles.pageHeader}>
             <h1 className={styles.title}>Manage Tasks</h1>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={handleSeedTasks}
-                className={styles.createBtn}
-                style={{ backgroundColor: '#ff9800' }}
-              >
-                <i className="fas fa-sync"></i> Reset/Seed Tasks
-              </button>
               <Link href="/admin/tasks/create" className={styles.createBtn}>
                 <i className="fas fa-plus"></i> Create Task
               </Link>
@@ -140,11 +166,14 @@ export default function TasksManagement() {
                   {tasks.map((task) => (
                     <tr key={task.id}>
                       <td>{task.title}</td>
-                      <td>{task.type}</td>
+                      <td>
+                        {task.type === 'xp' ? 'Points' :
+                          task.type.charAt(0).toUpperCase() + task.type.slice(1)}
+                      </td>
                       <td>
                         {task.rewardType === 'badge' ? (
                           <>
-                            <span>Badge: {badges.find((b) => b.id === task.badgeId)?.name || task.badgeId || 'Unknown'}</span>
+                            <span>Badge: {badges.find((b) => b.id === task.badgeId)?.name || (task.badgeId ? `ID: ${task.badgeId}` : 'Unknown')}</span>
                             {task.xpReward > 0 && <span style={{ display: 'block', fontSize: '12px', color: '#666' }}>+ {task.xpReward} XP</span>}
                           </>
                         ) : (
@@ -190,98 +219,70 @@ export default function TasksManagement() {
                   </div>
                   <div className={styles.formGroup}>
                     <label>Type</label>
-                    <select value={currentTask.type} onChange={(e) => setCurrentTask({ ...currentTask, type: e.target.value })}>
-                      <option value="recycle">Recycle</option>
-                      <option value="donate">Donate</option>
-                      <option value="other">Other</option>
+                    <option value="recycle">Recycle</option>
+                    <option value="donate">Donate</option>
+                    <option value="xp">Points</option>
+                    {/* Only show 'other' if the task is already type 'other', to allow migration away */}
+                    {currentTask.type === 'other' && <option value="other">Other (Legacy)</option>}
+                  </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Target Amount</label>
+                <input type="number" value={currentTask.target || 0} onChange={(e) => setCurrentTask({ ...currentTask, target: Number(e.target.value) })} />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Reward Type</label>
+                <div style={{ display: 'flex', gap: '20px', marginTop: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500' }}>
+                    <input type="radio" name="rewardType" value="xp" checked={(currentTask.rewardType || 'xp') === 'xp'} onChange={() => setCurrentTask({ ...currentTask, rewardType: 'xp' })} />
+                    <span>XP Points</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500' }}>
+                    <input type="radio" name="rewardType" value="badge" checked={(currentTask.rewardType || 'xp') === 'badge'} onChange={() => setCurrentTask({ ...currentTask, rewardType: 'badge' })} />
+                    <span>Badge</span>
+                  </label>
+                </div>
+              </div>
+
+              {(currentTask.rewardType || 'xp') === 'xp' && (
+                <div className={styles.formGroup}>
+                  <label>XP Reward Amount</label>
+                  <input type="number" value={(currentTask as any).xpReward || 50} onChange={(e) => setCurrentTask({ ...currentTask, xpReward: Number(e.target.value) } as any)} min={10} step={10} required />
+                </div>
+              )}
+
+              {(currentTask.rewardType || 'xp') === 'badge' && (
+                <div>
+                  <div className={styles.formGroup}>
+                    <label>Select Badge</label>
+                    <select value={currentTask.badgeId || ''} onChange={(e) => setCurrentTask({ ...currentTask, badgeId: e.target.value })} required>
+                      <option value="">-- Select Badge --</option>
+                      {badges.map((badge) => (
+                        <option key={badge.id} value={badge.id}>
+                          {badge.icon} {badge.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
-                  <div className={styles.formGroup}>
-                    <label>Target Amount</label>
-                    <input type="number" value={currentTask.target || 0} onChange={(e) => setCurrentTask({ ...currentTask, target: Number(e.target.value) })} />
-                  </div>
+                </div>
+              )}
 
-                  <div className={styles.formGroup}>
-                    <label>Reward Type</label>
-                    <div style={{ display: 'flex', gap: '20px', marginTop: '8px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500' }}>
-                        <input type="radio" name="rewardType" value="xp" checked={(currentTask.rewardType || 'xp') === 'xp'} onChange={() => setCurrentTask({ ...currentTask, rewardType: 'xp' })} />
-                        <span>XP Points</span>
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: '500' }}>
-                        <input type="radio" name="rewardType" value="badge" checked={(currentTask.rewardType || 'xp') === 'badge'} onChange={() => setCurrentTask({ ...currentTask, rewardType: 'badge' })} />
-                        <span>Badge</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {(currentTask.rewardType || 'xp') === 'xp' && (
-                    <div className={styles.formGroup}>
-                      <label>XP Reward Amount</label>
-                      <input type="number" value={(currentTask as any).xpReward || 50} onChange={(e) => setCurrentTask({ ...currentTask, xpReward: Number(e.target.value) } as any)} min={10} step={10} required />
-                    </div>
-                  )}
-
-                  {(currentTask.rewardType || 'xp') === 'badge' && (
-                    <div>
-                      <div className={styles.formGroup}>
-                        <label>Select Badge</label>
-                        <select value={currentTask.badgeId || ''} onChange={(e) => setCurrentTask({ ...currentTask, badgeId: e.target.value })} required>
-                          <option value="">-- Select Badge --</option>
-                          {badges.map((badge) => (
-                            <option key={badge.id} value={badge.id}>
-                              {badge.icon} {badge.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <button type="button" className={styles.secondaryButton} onClick={() => setShowCreateBadge(!showCreateBadge)}>
-                        {showCreateBadge ? '✕ Cancel' : '+ Create New Badge'}
-                      </button>
-
-                      {showCreateBadge && (
-                        <div className={styles.badgeCreationBox}>
-                          <h4>Create New Badge</h4>
-                          <div className={styles.formGroup}>
-                            <label>Badge Name</label>
-                            <input type="text" placeholder="e.g., Eco Warrior" value={newBadge.name} onChange={(e) => setNewBadge({ ...newBadge, name: e.target.value })} />
-                          </div>
-                          <div className={styles.formGroup}>
-                            <label>Badge Description</label>
-                            <textarea placeholder="e.g., Complete 5 recycling tasks" value={newBadge.description} onChange={(e) => setNewBadge({ ...newBadge, description: e.target.value })} />
-                          </div>
-                          <div className={styles.formGroup}>
-                            <label>Badge Icon</label>
-                            <div className={styles.iconSelector}>
-                              {['⭐', '🏆', '🎖️', '🥇', '🥈', '🥉', '💚', '♻️', '🌱', '🌍', '👑', '⚡', '🔥', '🎯'].map((icon) => (
-                                <button key={icon} type="button" className={`${styles.iconButton} ${newBadge.icon === icon ? styles.selected : ''}`} onClick={() => setNewBadge({ ...newBadge, icon })}>
-                                  {icon}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <button type="button" className={styles.saveBtn} onClick={handleCreateBadge}>
-                            Create Badge
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className={styles.modalActions}>
-                    <button type="button" className={styles.cancelBtn} onClick={() => setIsEditModalOpen(false)}>
-                      Cancel
-                    </button>
-                    <button type="submit" className={styles.saveBtn}>
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.cancelBtn} onClick={() => setIsEditModalOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className={styles.saveBtn}>
+                  Save Changes
+                </button>
               </div>
-            </div>
-          )}
-        </main>
-      </div>
-    </AdminRoute>
+            </form>
+              </div>
+    </div>
+  )
+}
+        </main >
+      </div >
+    </AdminRoute >
   );
 }

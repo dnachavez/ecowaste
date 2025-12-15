@@ -183,7 +183,7 @@ export default function OtherUserProfilePage() {
   }
 
   // Badge calculations (case‑insensitive)
-  const userBadges = userData.badges || [];
+  const userBadges = (userData.badges || []).map((b: string) => b.trim());
   const unlockedBadges = badgesList.filter(b => b.badgeId && userBadges.some(ub => ub.toLowerCase() === b.badgeId!.toLowerCase()));
   const lockedBadges = badgesList.filter(b => b.badgeId && !userBadges.some(ub => ub.toLowerCase() === b.badgeId!.toLowerCase()));
   const hasSierraMadre = userBadges.some(b => b.toLowerCase() === 'sierra_madre');
@@ -259,16 +259,42 @@ export default function OtherUserProfilePage() {
                     canEquip={currentUser?.uid === userId}
                   />
                 ))}
-                {hasSierraMadre && (showAllBadges || unlockedBadges.length < 5) && (
+                {/* Render unlocked Sierra Madre badge if user has it */}
+                {hasSierraMadre && (
                   <div className={styles.badgeItem}>
                     <div className={styles.badgeIcon}>
                       <img src="/sierra_madre_badge.svg" alt="Sierra Madre" style={{ width: '30px', filter: 'none' }} />
                     </div>
                     <h4>Sierra Madre</h4>
                     <p>Legendary Badge</p>
-                    <small>Completed All Tasks</small>
+                    <small>Unlocked</small>
                   </div>
                 )}
+                {/* Render locked Sierra Madre badge when not owned */}
+                {!hasSierraMadre && (
+                  <div className={`${styles.badgeItem} ${styles.locked}`}>
+                    <div className={styles.badgeIcon}>
+                      <img src="/sierra_madre_badge.svg" alt="Sierra Madre" style={{ width: '30px', filter: 'grayscale(1) opacity(0.5)' }} />
+                    </div>
+                    <h4>Sierra Madre</h4>
+                    <p>Complete all tasks to unlock this legendary badge</p>
+                    <small>Locked</small>
+                  </div>
+                )}
+                {/* Render other badges */}
+                {showAllBadges && unlockedBadges.slice(0, showAllBadges ? unlockedBadges.length : 5).map(badge => (
+                  <BadgeItem
+                    key={badge.id}
+                    icon={badge.icon || 'medal'}
+                    title={badge.title}
+                    desc={badge.description}
+                    isLocked={false}
+                    badgeId={badge.badgeId}
+                    isEquipped={(userData as any)?.equippedBadge === badge.badgeId}
+                    onEquip={handleEquipBadge}
+                    canEquip={currentUser?.uid === userId}
+                  />
+                ))}
                 {showAllBadges && lockedBadges.map(badge => (
                   <BadgeItem
                     key={badge.id}
@@ -279,16 +305,6 @@ export default function OtherUserProfilePage() {
                     target={badge.target}
                   />
                 ))}
-                {showAllBadges && !hasSierraMadre && (
-                  <div className={`${styles.badgeItem} ${styles.locked}`}>
-                    <div className={styles.badgeIcon}>
-                      <img src="/sierra_madre_badge.svg" alt="Sierra Madre" style={{ width: '30px', filter: 'grayscale(1) opacity:0.5' }} />
-                    </div>
-                    <h4>Sierra Madre</h4>
-                    <p>Complete all tasks to unlock this legendary badge</p>
-                    <small>Locked</small>
-                  </div>
-                )}
                 {unlockedBadges.length === 0 && !hasSierraMadre && !showAllBadges && (
                   <p style={{ gridColumn: '1/-1', textAlign: 'center', color: '#888' }}>No badges earned yet.</p>
                 )}
@@ -298,7 +314,7 @@ export default function OtherUserProfilePage() {
             <div className={styles.profileSection}>
               <div className={styles.sectionHeader}>
                 <h3>Recent Activity</h3>
-                {recentActivity.length > 5 && (
+                {recentActivity.length > 0 && (
                   <span className={styles.viewAll} onClick={() => setShowAllActivity(!showAllActivity)}>
                     {showAllActivity ? 'Hide' : 'View All'}
                   </span>
