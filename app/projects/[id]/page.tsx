@@ -896,6 +896,22 @@ export default function ProjectDetailsPage() {
         await awardXP(user.uid, 50); // 50 XP for project completion
         // Increment project count stat
         await incrementAction(user.uid, 'project', 1);
+
+        // Also increment recycling count based on materials used
+        // Calculate total quantity of materials in the project
+        let totalRecycledItems = 0;
+        const materialsList = project.materials ? (Array.isArray(project.materials) ? project.materials : Object.values(project.materials)) : [];
+
+        if (materialsList.length > 0) {
+          totalRecycledItems = materialsList.reduce((acc: number, mat: any) => {
+            const qty = parseInt(mat.quantity);
+            return acc + (isNaN(qty) ? 0 : qty);
+          }, 0);
+        }
+
+        if (totalRecycledItems > 0) {
+          await incrementAction(user.uid, 'recycle', totalRecycledItems);
+        }
       }
 
       showToast(`Project successfully ${shareOption === 'community' ? 'shared to community' : 'marked as private'}!`, 'success');

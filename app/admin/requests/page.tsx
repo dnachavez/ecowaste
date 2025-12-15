@@ -110,21 +110,31 @@ export default function RequestsManagement() {
 
     try {
       const originalRequest = requests.find(r => r.id === currentRequest.id);
-      const isCompleting = currentRequest.status === 'completed' && originalRequest?.status !== 'completed';
+
+      // Auto-complete logic: If Delivery Status is Delivered, request must be completed.
+      let newStatus = currentRequest.status;
+      let newDeliveryStatus = currentRequest.deliveryStatus || '';
+
+      if (newDeliveryStatus === 'Delivered') {
+        newStatus = 'completed';
+      }
+
+      // Reciprocal: If status is completed, force delivery status to Delivered
+      if (newStatus === 'completed') {
+        newDeliveryStatus = 'Delivered';
+      }
+
+      const isCompleting = newStatus === 'completed' && originalRequest?.status !== 'completed';
 
       const updates: Partial<Request> = {
         pickupDate: currentRequest.pickupDate || '',
         deliveryDate: currentRequest.deliveryDate || '',
-        status: currentRequest.status,
-        deliveryStatus: currentRequest.deliveryStatus || ''
+        status: newStatus,
+        deliveryStatus: newDeliveryStatus
       };
 
-      // If status is completed, force deliveryStatus to Delivered if not set manually
-      if (currentRequest.status === 'completed') {
-        updates.deliveryStatus = 'Delivered';
-        if (!updates.deliveryDate) {
-          updates.deliveryDate = new Date().toISOString();
-        }
+      if (newStatus === 'completed' && !updates.deliveryDate) {
+        updates.deliveryDate = new Date().toISOString();
       }
 
       const requestRef = ref(db, `requests/${currentRequest.id}`);

@@ -7,161 +7,119 @@ import AdminSidebar from '../../../components/AdminSidebar';
 import AdminRoute from '../../../components/AdminRoute';
 import styles from './tasks.module.css';
 import { db } from '../../../lib/firebase';
-import { ref, onValue, remove, update, push, get } from 'firebase/database';
+import { seedBadges } from '../../../lib/seedBadges';
 import { useAuth } from '../../../context/AuthContext';
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  xpReward?: number;
-  badgeId?: string;
-  rewardType?: 'xp' | 'badge';
-  type: string;
-  target?: number;
-  createdAt: number;
-}
-
-interface Badge {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-}
 
 export default function TasksManagement() {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [badges, setBadges] = useState<Badge[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [badges, setBadges] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [currentTask, setCurrentTask] = useState<Task | null>(null);
-  const [showCreateBadge, setShowCreateBadge] = useState(false);
-  const [newBadge, setNewBadge] = useState({ name: '', description: '', icon: '⭐' });
 
   useEffect(() => {
-    if (!user) return;
+    // Fetch tasks & badges
+    const fetchContent = async () => {
+      try {
+        const { ref, get } = await import('firebase/database');
 
-    const tasksRef = ref(db, 'tasks');
-    const badgesRef = ref(db, 'badges');
-
-    const unsubscribeTasks = onValue(
-      tasksRef,
-      (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const tasksList = Object.entries(data).map(([key, value]) => ({ id: key, ...(value as any) }));
-          setTasks(tasksList as Task[]);
+        // Tasks
+        const tasksSnapshot = await get(ref(db, 'tasks'));
+        if (tasksSnapshot.exists()) {
+          const tasksList = Object.entries(tasksSnapshot.val()).map(([key, val]: [string, any]) => ({
+            id: key,
+            ...val
+          }));
+          setTasks(tasksList);
         } else {
           setTasks([]);
         }
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Error fetching tasks:', error);
+
+        // Badges (optional if we need them separately, but typically tasks handle definition)
+        // Let's just assume we load tasks for now. 
+        // If badges collection exists:
+        // const badgesSnapshot = await get(ref(db, 'badges'));
+        // ...
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+      } finally {
         setLoading(false);
       }
-    );
-
-    const unsubscribeBadges = onValue(badgesRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const badgesData = snapshot.val();
-        const badgesList = Object.entries(badgesData).map(([key, value]: [string, any]) => ({ id: key, ...value }));
-        setBadges(badgesList as Badge[]);
-      } else {
-        setBadges([]);
-      }
-    });
-
-    return () => {
-      unsubscribeTasks();
-      unsubscribeBadges();
     };
+
+    if (user) {
+      fetchContent();
+    }
   }, [user]);
 
-  // Debug: log badges/tasks to help find mismatches between task.badgeId and badges
-  useEffect(() => {
-    console.log('Admin tasks page - badges', badges);
-  }, [badges]);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [currentTask, setCurrentTask] = useState<any>(null);
+  const [showCreateBadge, setShowCreateBadge] = useState(false);
 
-  useEffect(() => {
-    console.log('Admin tasks page - tasks', tasks);
-  }, [tasks]);
-
-  const handleDeleteTask = async (taskId: string) => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
-    try {
-      await remove(ref(db, `tasks/${taskId}`));
-      alert('Task deleted successfully');
-    } catch (error) {
-      console.error('Error deleting task:', error);
-      alert('Failed to delete task');
-    }
-  };
-
-  const handleEditClick = (task: Task) => {
+  const handleEditClick = (task: any) => {
     setCurrentTask(task);
     setIsEditModalOpen(true);
   };
 
-  const handleCreateBadge = async () => {
-    if (!newBadge.name.trim() || !newBadge.description.trim()) {
-      alert('Badge name and description are required');
-      return;
-    }
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
     try {
-      const badgesRef = ref(db, 'badges');
-      const newBadgeRef = await push(badgesRef, { ...newBadge, createdAt: Date.now() });
-      if (currentTask && newBadgeRef.key) setCurrentTask({ ...currentTask, badgeId: newBadgeRef.key });
-      setNewBadge({ name: '', description: '', icon: '⭐' });
-      setShowCreateBadge(false);
-      alert('Badge created successfully!');
-    } catch (error) {
-      console.error('Error creating badge:', error);
-      alert('Failed to create badge');
+      const { ref, remove } = await import('firebase/database');
+      await remove(ref(db, `tasks/${taskId}`));
+      alert('Task deleted');
+    } catch (e) {
+      console.error(e);
+      alert('Error deleting task');
     }
   };
 
   const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentTask) return;
     try {
-      const taskRef = ref(db, `tasks/${currentTask.id}`);
-      const updateData: any = {
-        title: currentTask.title,
-        description: currentTask.description,
-        type: currentTask.type,
-        target: Number(currentTask.target || 0),
-        rewardType: currentTask.rewardType || 'xp'
-      };
-      if (currentTask.rewardType === 'xp') {
-        updateData.xpReward = Number((currentTask as any).xpReward || 50);
-        delete updateData.badgeId;
-      } else {
-        updateData.badgeId = currentTask.badgeId;
-        delete updateData.xpReward;
-      }
-      await update(taskRef, updateData);
+      const { ref, update } = await import('firebase/database');
+      await update(ref(db, `tasks/${currentTask.id}`), currentTask);
       setIsEditModalOpen(false);
-      alert('Task updated successfully');
-    } catch (error) {
-      console.error('Error updating task:', error);
-      alert('Failed to update task');
+      setCurrentTask(null);
+      alert('Task updated');
+    } catch (err) {
+      console.error(err);
+      alert('Error updating task');
     }
+  };
+
+  const handleSeedTasks = async () => {
+    if (!confirm('This will RESET all tasks to the default set. Are you sure?')) return;
+    setLoading(true);
+    try {
+      const message = await seedBadges();
+      alert(message);
+    } catch (error) {
+      console.error('Seed error:', error);
+      alert('Failed to seed tasks.');
+    }
+    setLoading(false);
   };
 
   return (
     <AdminRoute>
-        <Header />
+      <Header />
 
-        <div className={styles.container}>
+      <div className={styles.container}>
         <AdminSidebar />
         <main className={styles.mainContent}>
           <div className={styles.pageHeader}>
             <h1 className={styles.title}>Manage Tasks</h1>
-            <Link href="/admin/tasks/create" className={styles.createBtn}>
-              <i className="fas fa-plus"></i> Create Task
-            </Link>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={handleSeedTasks}
+                className={styles.createBtn}
+                style={{ backgroundColor: '#ff9800' }}
+              >
+                <i className="fas fa-sync"></i> Reset/Seed Tasks
+              </button>
+              <Link href="/admin/tasks/create" className={styles.createBtn}>
+                <i className="fas fa-plus"></i> Create Task
+              </Link>
+            </div>
           </div>
 
           {loading ? (
@@ -184,7 +142,14 @@ export default function TasksManagement() {
                       <td>{task.title}</td>
                       <td>{task.type}</td>
                       <td>
-                        {task.rewardType === 'badge' ? `Badge: ${badges.find((b) => b.id === task.badgeId)?.name || 'Unknown'}` : `${task.xpReward || 50} XP`}
+                        {task.rewardType === 'badge' ? (
+                          <>
+                            <span>Badge: {badges.find((b) => b.id === task.badgeId)?.name || task.badgeId || 'Unknown'}</span>
+                            {task.xpReward > 0 && <span style={{ display: 'block', fontSize: '12px', color: '#666' }}>+ {task.xpReward} XP</span>}
+                          </>
+                        ) : (
+                          `${task.xpReward || 50} XP`
+                        )}
                       </td>
                       <td>{task.target || 'N/A'}</td>
                       <td>

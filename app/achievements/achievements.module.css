@@ -93,7 +93,7 @@
     right: 0;
     background-color: white;
     border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     width: 200px;
     z-index: 100;
     display: none;
@@ -137,17 +137,17 @@
 .sidebar {
     background: linear-gradient(180deg, #F6FFEB 0%, #e8f5e8 100%);
     padding: 30px 20px;
-    box-shadow: 5px 0 25px rgba(0,0,0,0.08);
+    box-shadow: 5px 0 25px rgba(0, 0, 0, 0.08);
     position: sticky;
     width: 250px;
     top: 90px;
     align-self: start;
     height: calc(100vh - 90px);
-    overflow: hidden;
-    left: 0;
+    /* overflow: hidden; Removed to prevent double scroll issues */
+    /* left: 0; */
     border: 1px solid rgba(130, 170, 82, 0.2);
-    scrollbar-width: thin;
-    scrollbar-color: #82AA52 rgba(130, 170, 82, 0.1);
+    /* scrollbar-width: thin; */
+    /* scrollbar-color: #82AA52 rgba(130, 170, 82, 0.1); */
 }
 
 .sidebar nav ul {
@@ -177,7 +177,7 @@
 .sidebar nav a.active,
 .sidebar nav a:hover {
     background: linear-gradient(135deg, #82AA52 0%, #2e8b57 100%);
-    color:#F6FFEB;
+    color: #F6FFEB;
     transform: translateX(5px);
     box-shadow: 0 5px 15px rgba(130, 170, 82, 0.3);
 }
@@ -211,7 +211,7 @@
     padding: 30px;
     background-color: #fff;
     border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .achievementsHeader {
@@ -313,7 +313,7 @@
     padding: 20px;
     border-radius: 10px;
     text-align: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
 .statNumber {
@@ -437,7 +437,7 @@
     background: white;
     padding: 25px;
     border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .sierraMadreBadgeContainer.locked {
@@ -460,7 +460,8 @@
     justify-content: center;
     position: relative;
     border: 3px solid #999;
-    overflow: hidden; /* Ensures image stays within circle */
+    overflow: hidden;
+    /* Ensures image stays within circle */
 }
 
 .lockedBadgeIcon img {
@@ -477,7 +478,7 @@
     top: 5px;
     right: 5px;
     font-size: 24px;
-    background: rgba(255,255,255,0.9);
+    background: rgba(255, 255, 255, 0.9);
     border-radius: 50%;
     width: 35px;
     height: 35px;
@@ -560,7 +561,7 @@
     justify-content: center;
     font-size: 28px;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
     z-index: 1000;
     transition: all 0.3s ease;
 }
@@ -577,7 +578,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0, 0, 0, 0.5);
     z-index: 2000;
     justify-content: center;
     align-items: center;
@@ -589,7 +590,7 @@
     border-radius: 8px;
     width: 90%;
     max-width: 500px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     position: relative;
 }
 
@@ -683,11 +684,11 @@
     .container {
         grid-template-columns: 1fr;
     }
-    
+
     .sidebar {
         display: none;
     }
-    
+
     .statsGrid {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
@@ -699,20 +700,21 @@
         align-items: flex-start;
         gap: 10px;
     }
-    
+
     .statsGrid {
         grid-template-columns: 1fr 1fr;
     }
-    
+
     .sierraMadreBadgeContainer {
         flex-direction: column;
         text-align: center;
     }
 }
+
 /* Task List Scrolling */
 .taskList {
-    max-height: 400px;
-    overflow-y: auto;
+    /* max-height: 400px; Removed to prevent double scroll */
+    /* overflow-y: auto; */
     border-radius: 8px;
     border: 1px solid #eee;
 }

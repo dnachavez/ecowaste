@@ -369,13 +369,27 @@ export default function DonationsPage() {
         } else {
             const requestRef = ref(db, `requests/${request.id}`);
             update(requestRef, { status: newStatus })
-                .then(() => {
+                .then(async () => {
                     if (newStatus === 'rejected') {
                         createNotification(
                             request.requesterId,
                             'Request Rejected',
                             `Your request for "${request.donationTitle}" has been rejected.`,
                             'error',
+                            request.id
+                        );
+                    } else if (newStatus === 'completed') {
+                        // Increment donation count for the owner (donor)
+                        if (request.ownerId) {
+                            await incrementAction(request.ownerId, 'donate', 1);
+                        }
+
+                        // Notify requester
+                        createNotification(
+                            request.requesterId,
+                            'Donation Received',
+                            `Your request for "${request.donationTitle}" has been completed.`,
+                            'success',
                             request.id
                         );
                     }
@@ -657,6 +671,7 @@ export default function DonationsPage() {
                                                             </button>
                                                         </>
                                                     )}
+
                                                     {(request.status === 'approved' || request.status === 'completed') && (
                                                         <button
                                                             className={styles['btn-view']}
