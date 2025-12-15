@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ref, onValue, update, remove, push, set } from 'firebase/database';
+import { ref, onValue, update, remove, push, set, get, query, orderByChild, equalTo } from 'firebase/database';
 // import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { db } from '../../../lib/firebase';
 import { awardXP, incrementAction } from '../../../lib/gamification';
@@ -59,7 +59,7 @@ export default function ProjectDetailsPage() {
   const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<'preparation' | 'construction' | 'share'>('preparation');
-  
+
   // Modal States
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [showAddStepModal, setShowAddStepModal] = useState(false);
@@ -89,7 +89,7 @@ export default function ProjectDetailsPage() {
   const [showAddImagesModal, setShowAddImagesModal] = useState(false);
   const [currentStepId, setCurrentStepId] = useState<string | null>(null);
   const [stepImages, setStepImages] = useState<string[]>([]);
-  
+
   // Share Stage State
   const [finalImages, setFinalImages] = useState<string[]>([]);
   const [shareOption, setShareOption] = useState<'private' | 'community' | null>(null);
@@ -98,6 +98,51 @@ export default function ProjectDetailsPage() {
   const [checklistError, setChecklistError] = useState<string>('');
   const [checklistFile, setChecklistFile] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [contributors, setContributors] = useState<string[]>([]);
+
+  // Material Auto-Completion Check
+  useEffect(() => {
+    if (!project || !project.materials) return;
+
+    let updatesFound = false;
+    const updates: Record<string, any> = {};
+
+    project.materials.forEach(material => {
+      if (!material.is_completed && material.acquired >= material.needed) {
+        updates[`/materials/${material.id}/is_completed`] = true;
+        updatesFound = true;
+      }
+    });
+
+    if (updatesFound) {
+      update(ref(db, `projects/${project.id}`), updates).catch(err => console.error("Error auto-completing materials:", err));
+    }
+  }, [project]);
+
+  // Fetch contributors when project is loaded and completed
+  useEffect(() => {
+    if (project && project.status === 'completed') {
+      const fetchContributors = async () => {
+        const requestsRef = ref(db, 'requests');
+        try {
+          const snapshot = await get(requestsRef);
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            const contributorsSet = new Set<string>();
+            Object.values(data).forEach((req: any) => {
+              if (req.projectId === project.id && req.status === 'approved' && req.ownerName) {
+                contributorsSet.add(req.ownerName);
+              }
+            });
+            setContributors(Array.from(contributorsSet));
+          }
+        } catch (error) {
+          console.error("Error fetching contributors:", error);
+        }
+      };
+      fetchContributors();
+    }
+  }, [project]);
   const [isDragging, setIsDragging] = useState(false);
 
   // Lightbox state
@@ -123,13 +168,13 @@ export default function ProjectDetailsPage() {
   };
 
   // Feedback state
-      const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-      const [rating, setRating] = useState(0);
-      const [feedbackText, setFeedbackText] = useState('');
-      const [isSubmitting, setIsSubmitting] = useState(false);
-      const [submitSuccess, setSubmitSuccess] = useState(false);
-      const [ratingError, setRatingError] = useState(false);
-      const [textError, setTextError] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [ratingError, setRatingError] = useState(false);
+  const [textError, setTextError] = useState(false);
 
 
   // Add Material Modal state
@@ -159,7 +204,7 @@ export default function ProjectDetailsPage() {
         if (data) {
           // Transform materials object to array if needed
           const materialsList = data.materials ? Object.entries(data.materials).map(([key, value]) => {
-            const mat = value as { needed?: number; quantity?: string; unit?: string; [key: string]: unknown };
+            const mat = value as { needed?: number; quantity?: string; unit?: string;[key: string]: unknown };
             return {
               ...mat,
               id: key, // Use Firebase key as the ID to ensure uniqueness and correct update path
@@ -167,7 +212,7 @@ export default function ProjectDetailsPage() {
               unit: mat.unit || 'units'
             };
           }) : [];
-          
+
           const stepsList = data.steps ? Object.entries(data.steps as Record<string, Omit<Step, 'id'>>).map(([key, value]) => ({
             ...value,
             id: key
@@ -370,7 +415,7 @@ export default function ProjectDetailsPage() {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       processFile(e.dataTransfer.files[0]);
     }
@@ -448,7 +493,7 @@ export default function ProjectDetailsPage() {
 
   const handleDeleteMaterial = async (materialId: string) => {
     if (!project || project.workflow_stage > 1) return;
-    
+
     if (window.confirm('Are you sure you want to delete this material?')) {
       try {
         const materialRef = ref(db, `projects/${project.id}/materials/${materialId}`);
@@ -636,7 +681,7 @@ export default function ProjectDetailsPage() {
 
   const handleDeleteStep = async (stepId: string) => {
     if (!project || project.workflow_stage > 2) return;
-    
+
     if (window.confirm('Are you sure you want to delete this step?')) {
       try {
         // Get the step being deleted to know its step_number
@@ -724,7 +769,7 @@ export default function ProjectDetailsPage() {
   const handleStepImagesDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     if (e.dataTransfer.files) {
       processStepImages(e.dataTransfer.files);
     }
@@ -751,11 +796,11 @@ export default function ProjectDetailsPage() {
       // Update local state immediately to reflect changes without waiting for onValue
       // although onValue is fast, this gives immediate feedback if there's any lag
       setProject(prev => {
-          if (!prev) return null;
-          return {
-              ...prev,
-              steps: prev.steps.map(s => s.id === currentStepId ? { ...s, images: updatedImages } : s)
-          };
+        if (!prev) return null;
+        return {
+          ...prev,
+          steps: prev.steps.map(s => s.id === currentStepId ? { ...s, images: updatedImages } : s)
+        };
       });
 
       setShowAddImagesModal(false);
@@ -769,31 +814,31 @@ export default function ProjectDetailsPage() {
 
   const handleDeleteStepImage = async (stepId: string, imageIndex: number) => {
     if (!project || project.workflow_stage > 2) return;
-    
+
     if (window.confirm('Are you sure you want to delete this image?')) {
-        try {
-            const currentStep = project.steps.find(s => s.id === stepId);
-            if (!currentStep || !currentStep.images) return;
+      try {
+        const currentStep = project.steps.find(s => s.id === stepId);
+        if (!currentStep || !currentStep.images) return;
 
-            const updatedImages = currentStep.images.filter((_, idx) => idx !== imageIndex);
-            
-            const stepRef = ref(db, `projects/${project.id}/steps/${stepId}`);
-            await update(stepRef, {
-                images: updatedImages
-            });
+        const updatedImages = currentStep.images.filter((_, idx) => idx !== imageIndex);
 
-            // Optimistic update
-            setProject(prev => {
-                if (!prev) return null;
-                return {
-                    ...prev,
-                    steps: prev.steps.map(s => s.id === stepId ? { ...s, images: updatedImages } : s)
-                };
-            });
-        } catch (error) {
-            console.error('Error deleting step image:', error);
-            alert('Failed to delete image.');
-        }
+        const stepRef = ref(db, `projects/${project.id}/steps/${stepId}`);
+        await update(stepRef, {
+          images: updatedImages
+        });
+
+        // Optimistic update
+        setProject(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            steps: prev.steps.map(s => s.id === stepId ? { ...s, images: updatedImages } : s)
+          };
+        });
+      } catch (error) {
+        console.error('Error deleting step image:', error);
+        alert('Failed to delete image.');
+      }
     }
   };
 
@@ -817,7 +862,7 @@ export default function ProjectDetailsPage() {
   const handleFinalImagesDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     if (e.dataTransfer.files) {
       processFinalImages(e.dataTransfer.files);
     }
@@ -847,12 +892,12 @@ export default function ProjectDetailsPage() {
       });
 
       if (user) {
-         // Award XP for completing a project
-         await awardXP(user.uid, 50); // 50 XP for project completion
-         // Increment project count stat
-         await incrementAction(user.uid, 'project', 1);
+        // Award XP for completing a project
+        await awardXP(user.uid, 50); // 50 XP for project completion
+        // Increment project count stat
+        await incrementAction(user.uid, 'project', 1);
       }
-      
+
       showToast(`Project successfully ${shareOption === 'community' ? 'shared to community' : 'marked as private'}!`, 'success');
       // Optionally redirect or update UI state
     } catch (error) {
@@ -917,46 +962,46 @@ export default function ProjectDetailsPage() {
   };
 
   const handleFeedbackSubmit = (e: React.FormEvent) => {
-          e.preventDefault();
-          
-          let valid = true;
-          if (rating === 0) {
-            setRatingError(true);
-            valid = false;
-          } else {
-            setRatingError(false);
-          }
-          
-          if (feedbackText.trim() === '') {
-            setTextError(true);
-            valid = false;
-          } else {
-            setTextError(false);
-          }
-          
-          if (!valid) return;
-          
-          setIsSubmitting(true);
-          
-          // Simulate API call
-          setTimeout(() => {
-            setIsSubmitting(false);
-            setSubmitSuccess(true);
-            
-            // Reset and close after 3 seconds
-            setTimeout(() => {
-              setIsFeedbackOpen(false);
-              setSubmitSuccess(false);
-              setRating(0);
-              setFeedbackText('');
-            }, 3000);
-          }, 1500);
-        };
+    e.preventDefault();
+
+    let valid = true;
+    if (rating === 0) {
+      setRatingError(true);
+      valid = false;
+    } else {
+      setRatingError(false);
+    }
+
+    if (feedbackText.trim() === '') {
+      setTextError(true);
+      valid = false;
+    } else {
+      setTextError(false);
+    }
+
+    if (!valid) return;
+
+    setIsSubmitting(true);
+
+    // Simulate API call
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setSubmitSuccess(true);
+
+      // Reset and close after 3 seconds
+      setTimeout(() => {
+        setIsFeedbackOpen(false);
+        setSubmitSuccess(false);
+        setRating(0);
+        setFeedbackText('');
+      }, 3000);
+    }, 1500);
+  };
 
 
   return (
     <ProtectedRoute>
-        <Header />
+      <Header />
 
       <div className={styles.container}>
         <Sidebar />
@@ -974,19 +1019,19 @@ export default function ProjectDetailsPage() {
                 <i className="fas fa-edit"></i> Edit Project
               </button>
             </div>
-            
+
             <div className={styles['project-title-section']}>
               <span className={styles['project-section-label']}>Project Title</span>
               <h1 className={styles['project-title']}>{project.title}</h1>
             </div>
-            
+
             <div className={styles['project-description-section']}>
               <span className={styles['project-section-label']}>Project Description</span>
               <div className={styles['project-description']}>
                 {project.description}
               </div>
             </div>
-            
+
             <div className={styles['project-meta']}>
               <i className="far fa-calendar-alt"></i> Created: {formatDate((project as any).created_at || (project as any).createdAt)}
             </div>
@@ -998,24 +1043,24 @@ export default function ProjectDetailsPage() {
               <i className="fas fa-tasks"></i> Project Workflow
             </h2>
             {/* 100% badge moved into the Share stage header for clearer context */}
-            
+
             {/* Progress Bar */}
             <div className={styles['progress-container']}>
               <div className={styles['progress-text']}>
                 Stage {activeTab === 'preparation' ? 1 : activeTab === 'construction' ? 2 : 3} of 3
               </div>
               <div className={styles['progress-bar']}>
-                <div 
-                  className={styles['progress-fill']} 
+                <div
+                  className={styles['progress-fill']}
                   style={{ width: `${calculateProgress()}%` }}
                 ></div>
               </div>
             </div>
-            
+
             {/* Tab Navigation */}
             <div className={styles['workflow-tabs']}>
               <div className={styles['tab-nav']}>
-                <button 
+                <button
                   className={`${styles['tab-button']} ${activeTab === 'preparation' ? styles.active : ''}`}
                   onClick={() => handleTabChange('preparation')}
                   disabled={project.workflow_stage !== 1}
@@ -1023,7 +1068,7 @@ export default function ProjectDetailsPage() {
                   <span className={styles['tab-number']}>1</span>
                   Preparation
                 </button>
-                <button 
+                <button
                   className={`${styles['tab-button']} ${activeTab === 'construction' ? styles.active : ''}`}
                   onClick={() => handleTabChange('construction')}
                   disabled={project.workflow_stage !== 2}
@@ -1031,7 +1076,7 @@ export default function ProjectDetailsPage() {
                   <span className={styles['tab-number']}>2</span>
                   Construction
                 </button>
-                <button 
+                <button
                   className={`${styles['tab-button']} ${activeTab === 'share' ? styles.active : ''}`}
                   onClick={() => handleTabChange('share')}
                   disabled={project.workflow_stage !== 3}
@@ -1041,10 +1086,10 @@ export default function ProjectDetailsPage() {
                 </button>
               </div>
             </div>
-            
+
             {/* Tab Content */}
             <div className={styles['tab-content-container']}>
-              
+
               {/* Preparation Tab */}
               {activeTab === 'preparation' && project.status !== 'completed' && (
                 <div className={styles['tab-content']} style={{ display: 'block' }}>
@@ -1052,7 +1097,7 @@ export default function ProjectDetailsPage() {
                     {project.workflow_stage > 1 && (
                       <span className={styles['stage-check']}><i className="fas fa-check"></i></span>
                     )}
-                    
+
                     <div className={styles['stage-header']}>
                       <div className={styles['stage-marker']}>
                         <span className={styles['stage-number']}>1</span>
@@ -1067,7 +1112,7 @@ export default function ProjectDetailsPage() {
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className={styles['stage-content']}>
                       <h4 className={styles['content-title']}>Materials Needed</h4>
                       <ul className={styles['materials-list']}>
@@ -1075,41 +1120,41 @@ export default function ProjectDetailsPage() {
                           <li key={material.id} className={styles['material-item']}>
                             <div className={styles['material-info']}>
                               <div className={styles['material-name']}>{material.name}</div>
-                                  {material.evidence_image && (
-                                    <div style={{ marginTop: '10px', position: 'relative', width: '90px', height: '90px', cursor: 'pointer' }}>
-                                      <img 
-                                        src={material.evidence_image} 
-                                        alt={`Evidence for ${material.name}`} 
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px', border: '2px solid #ddd', transition: 'transform 0.2s' }}
-                                        onClick={() => setLightboxImage(material.evidence_image || null)}
-                                        title="Click to view full size"
-                                      />
-                                      <button
-                                        onClick={() => handleDeleteEvidence(material.id)}
-                                        title="Delete evidence photo"
-                                        style={{ 
-                                          position: 'absolute', 
-                                          top: '-8px', 
-                                          right: '-8px', 
-                                          background: '#dc3545', 
-                                          color: '#fff',
-                                          border: 'none',
-                                          borderRadius: '50%', 
-                                          padding: '8px', 
-                                          cursor: 'pointer',
-                                          width: '32px',
-                                          height: '32px',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          fontSize: '14px',
-                                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-                                        }}
-                                      >
-                                        <i className="fas fa-trash"></i>
-                                      </button>
-                                    </div>
-                                  )}
+                              {material.evidence_image && (
+                                <div style={{ marginTop: '10px', position: 'relative', width: '90px', height: '90px', cursor: 'pointer' }}>
+                                  <img
+                                    src={material.evidence_image}
+                                    alt={`Evidence for ${material.name}`}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px', border: '2px solid #ddd', transition: 'transform 0.2s' }}
+                                    onClick={() => setLightboxImage(material.evidence_image || null)}
+                                    title="Click to view full size"
+                                  />
+                                  <button
+                                    onClick={() => handleDeleteEvidence(material.id)}
+                                    title="Delete evidence photo"
+                                    style={{
+                                      position: 'absolute',
+                                      top: '-8px',
+                                      right: '-8px',
+                                      background: '#dc3545',
+                                      color: '#fff',
+                                      border: 'none',
+                                      borderRadius: '50%',
+                                      padding: '8px',
+                                      cursor: 'pointer',
+                                      width: '32px',
+                                      height: '32px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '14px',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                                    }}
+                                  >
+                                    <i className="fas fa-trash"></i>
+                                  </button>
+                                </div>
+                              )}
                               <div className={styles['material-quantity']}>
                                 <span className={`${styles['quantity-display']} ${material.is_completed ? styles.completed : ''}`}>
                                   {material.acquired || 0}/{material.needed}
@@ -1125,26 +1170,26 @@ export default function ProjectDetailsPage() {
                               {material.is_completed ? (
                                 // When completed, show upload photo and delete material buttons
                                 <>
-                                  <button 
+                                  <button
                                     className={`${styles['btn']} ${styles['small']} ${styles['primary']}`}
                                     onClick={() => handleOpenUploadPhotoModal(material.id)}
                                     disabled={project.workflow_stage > 1}
-                                    style={{ 
-                                      opacity: project.workflow_stage > 1 ? 0.5 : 1, 
-                                      cursor: project.workflow_stage > 1 ? 'not-allowed' : 'pointer' 
+                                    style={{
+                                      opacity: project.workflow_stage > 1 ? 0.5 : 1,
+                                      cursor: project.workflow_stage > 1 ? 'not-allowed' : 'pointer'
                                     }}
                                     title="Replace or upload evidence photo"
                                   >
                                     <i className="fas fa-camera"></i> Upload Photo
                                   </button>
-                                  <button 
+                                  <button
                                     className={`${styles['btn']} ${styles['small']} ${styles['danger']}`}
                                     onClick={() => handleDeleteMaterial(material.id)}
                                     title="Delete material"
                                     disabled={project.workflow_stage > 1}
-                                    style={{ 
-                                      opacity: project.workflow_stage > 1 ? 0.5 : 1, 
-                                      cursor: project.workflow_stage > 1 ? 'not-allowed' : 'pointer' 
+                                    style={{
+                                      opacity: project.workflow_stage > 1 ? 0.5 : 1,
+                                      cursor: project.workflow_stage > 1 ? 'not-allowed' : 'pointer'
                                     }}
                                   >
                                     <i className="fas fa-trash"></i>
@@ -1152,14 +1197,14 @@ export default function ProjectDetailsPage() {
                                 </>
                               ) : (
                                 <>
-                                  <button 
+                                  <button
                                     className={`${styles['btn']} ${styles['checklist-btn']}`}
                                     onClick={() => handleChecklistClick(material)}
                                     disabled={project.workflow_stage > 1}
                                     title="Update amount"
                                     aria-label={`Update amount for ${material.name}`}
-                                    style={{ 
-                                      opacity: project.workflow_stage > 1 ? 0.5 : 1, 
+                                    style={{
+                                      opacity: project.workflow_stage > 1 ? 0.5 : 1,
                                       cursor: project.workflow_stage > 1 ? 'not-allowed' : 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
@@ -1168,22 +1213,22 @@ export default function ProjectDetailsPage() {
                                   >
                                     <i className="fas fa-check"></i>
                                   </button>
-                                  <Link 
-                                    href={`/browse?search=${encodeURIComponent(material.name)}`}
+                                  <Link
+                                    href={`/browse?search=${encodeURIComponent(material.name)}&projectId=${params.id}&materialId=${material.id}`}
                                     className={`${styles['btn']} ${styles['small']} ${styles['primary']}`}
                                     title="Find Donation"
                                     style={{ marginRight: '5px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                                   >
                                     <i className="fas fa-search"></i>
                                   </Link>
-                                  <button 
+                                  <button
                                     className={`${styles['btn']} ${styles['small']} ${styles['danger']}`}
                                     onClick={() => handleDeleteMaterial(material.id)}
                                     title="Delete material"
                                     disabled={project.workflow_stage > 1}
-                                    style={{ 
-                                      opacity: project.workflow_stage > 1 ? 0.5 : 1, 
-                                      cursor: project.workflow_stage > 1 ? 'not-allowed' : 'pointer' 
+                                    style={{
+                                      opacity: project.workflow_stage > 1 ? 0.5 : 1,
+                                      cursor: project.workflow_stage > 1 ? 'not-allowed' : 'pointer'
                                     }}
                                   >
                                     <i className="fas fa-trash"></i>
@@ -1194,22 +1239,22 @@ export default function ProjectDetailsPage() {
                           </li>
                         ))}
                       </ul>
-                      
+
                       <div className={styles['stage-actions']}>
                         {project.workflow_stage === 1 && (
                           <>
                             <button className={`${styles['btn']} ${styles['primary']}`} onClick={handleOpenAddMaterialModal} title="Add a new material to request">
                               <i className="fas fa-plus"></i> Add Material
                             </button>
-                            <button 
-                              className={`${styles['btn']} ${isAllMaterialsCompleted ? styles['primary'] : styles['secondary']}`} 
+                            <button
+                              className={`${styles['btn']} ${isAllMaterialsCompleted ? styles['primary'] : styles['secondary']}`}
                               onClick={handleProceed}
-                              disabled={!isAllMaterialsCompleted} 
+                              disabled={!isAllMaterialsCompleted}
                               title={isAllMaterialsCompleted ? 'Proceed to Construction' : 'Cannot proceed until all materials have evidence photos'}
-                              style={{ 
-                                opacity: isAllMaterialsCompleted ? 1 : 0.5, 
-                                cursor: isAllMaterialsCompleted ? 'pointer' : 'not-allowed', 
-                                marginLeft: '10px' 
+                              style={{
+                                opacity: isAllMaterialsCompleted ? 1 : 0.5,
+                                cursor: isAllMaterialsCompleted ? 'pointer' : 'not-allowed',
+                                marginLeft: '10px'
                               }}
                             >
                               Proceed
@@ -1245,138 +1290,138 @@ export default function ProjectDetailsPage() {
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className={styles['stage-content']}>
                       <h4 className={styles['content-title']}>Steps</h4>
                       <ul className={styles['steps-list']}>
                         {project.steps.sort((a, b) => (a.step_number || 0) - (b.step_number || 0)).map(step => (
                           <li key={step.id} className={styles['step-item']}>
                             <div className={styles['step-header-row']}>
-                               <h4 className={styles['step-title-text']} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', margin: 0 }}>Step {step.step_number}: {step.title}</h4>
-                               {(!step.images || step.images.length === 0) && (
-                                   <span className={styles['needs-images-badge']}>
-                                       <i className="fas fa-exclamation-circle"></i> Needs images (0 uploaded)
-                                   </span>
-                               )}
+                              <h4 className={styles['step-title-text']} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', margin: 0 }}>Step {step.step_number}: {step.title}</h4>
+                              {(!step.images || step.images.length === 0) && (
+                                <span className={styles['needs-images-badge']}>
+                                  <i className="fas fa-exclamation-circle"></i> Needs images (0 uploaded)
+                                </span>
+                              )}
                             </div>
 
                             <div className={styles['step-content-row']}>
-                                <div className={styles['step-description-box']} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', whiteSpace: 'normal' }}>
-                                    {step.description}
-                                </div>
-                                <div className={styles['step-actions-right']}>
-                                     <button 
-                                       className={`${styles['btn']} ${styles['small']} ${styles['primary']}`}
-                                       onClick={() => handleOpenEditStepModal(step)}
-                                       disabled={project.workflow_stage > 2}
-                                       style={{ 
-                                         opacity: project.workflow_stage > 2 ? 0.5 : 1, 
-                                         cursor: project.workflow_stage > 2 ? 'not-allowed' : 'pointer' 
-                                       }}
-                                       title="Edit step"
-                                     >
-                                         <i className="fas fa-edit"></i> Edit
-                                     </button>
-                                     <button 
-                                       className={`${styles['btn']} ${styles['add-images-btn']}`} 
-                                       onClick={() => handleAddImagesClick(step.id)}
-                                       disabled={project.workflow_stage > 2}
-                                       style={{ 
-                                         opacity: project.workflow_stage > 2 ? 0.5 : 1, 
-                                         cursor: project.workflow_stage > 2 ? 'not-allowed' : 'pointer' 
-                                       }}
-                                     >
-                                         <i className="fas fa-camera"></i> Add Images
-                                     </button>
-                                     <button 
-                                       className={`${styles['btn']} ${styles['delete-step-btn']}`} 
-                                       onClick={() => handleDeleteStep(step.id)}
-                                       disabled={project.workflow_stage > 2}
-                                       style={{ 
-                                         opacity: project.workflow_stage > 2 ? 0.5 : 1, 
-                                         cursor: project.workflow_stage > 2 ? 'not-allowed' : 'pointer' 
-                                       }}
-                                     >
-                                         <i className="fas fa-trash"></i>
-                                     </button>
-                                 </div>
+                              <div className={styles['step-description-box']} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', maxWidth: '100%', whiteSpace: 'normal' }}>
+                                {step.description}
+                              </div>
+                              <div className={styles['step-actions-right']}>
+                                <button
+                                  className={`${styles['btn']} ${styles['small']} ${styles['primary']}`}
+                                  onClick={() => handleOpenEditStepModal(step)}
+                                  disabled={project.workflow_stage > 2}
+                                  style={{
+                                    opacity: project.workflow_stage > 2 ? 0.5 : 1,
+                                    cursor: project.workflow_stage > 2 ? 'not-allowed' : 'pointer'
+                                  }}
+                                  title="Edit step"
+                                >
+                                  <i className="fas fa-edit"></i> Edit
+                                </button>
+                                <button
+                                  className={`${styles['btn']} ${styles['add-images-btn']}`}
+                                  onClick={() => handleAddImagesClick(step.id)}
+                                  disabled={project.workflow_stage > 2}
+                                  style={{
+                                    opacity: project.workflow_stage > 2 ? 0.5 : 1,
+                                    cursor: project.workflow_stage > 2 ? 'not-allowed' : 'pointer'
+                                  }}
+                                >
+                                  <i className="fas fa-camera"></i> Add Images
+                                </button>
+                                <button
+                                  className={`${styles['btn']} ${styles['delete-step-btn']}`}
+                                  onClick={() => handleDeleteStep(step.id)}
+                                  disabled={project.workflow_stage > 2}
+                                  style={{
+                                    opacity: project.workflow_stage > 2 ? 0.5 : 1,
+                                    cursor: project.workflow_stage > 2 ? 'not-allowed' : 'pointer'
+                                  }}
+                                >
+                                  <i className="fas fa-trash"></i>
+                                </button>
+                              </div>
                             </div>
 
                             <div className={styles['step-images-placeholder']}>
-                                {step.images && step.images.length > 0 ? (
-                                    <div className={styles['step-images-grid']}>
-                                        {step.images.map((img, idx) => (
-                                            <div key={idx} className={styles['step-image-item']}>
-                                                <img src={img} alt={`Step ${step.step_number} Image ${idx + 1}`} />
-                                                <button 
-                                                    className={styles['delete-step-image-btn']}
-                                                    onClick={() => handleDeleteStepImage(step.id, idx)}
-                                                    title="Remove image"
-                                                    disabled={project.workflow_stage > 2}
-                                                    style={{ 
-                                                      opacity: project.workflow_stage > 2 ? 0.5 : 1, 
-                                                      cursor: project.workflow_stage > 2 ? 'not-allowed' : 'pointer' 
-                                                    }}
-                                                >
-                                                    <i className="fas fa-times"></i>
-                                                </button>
-                                            </div>
-                                        ))}
+                              {step.images && step.images.length > 0 ? (
+                                <div className={styles['step-images-grid']}>
+                                  {step.images.map((img, idx) => (
+                                    <div key={idx} className={styles['step-image-item']}>
+                                      <img src={img} alt={`Step ${step.step_number} Image ${idx + 1}`} />
+                                      <button
+                                        className={styles['delete-step-image-btn']}
+                                        onClick={() => handleDeleteStepImage(step.id, idx)}
+                                        title="Remove image"
+                                        disabled={project.workflow_stage > 2}
+                                        style={{
+                                          opacity: project.workflow_stage > 2 ? 0.5 : 1,
+                                          cursor: project.workflow_stage > 2 ? 'not-allowed' : 'pointer'
+                                        }}
+                                      >
+                                        <i className="fas fa-times"></i>
+                                      </button>
                                     </div>
-                                ) : (
-                                    <div style={{fontStyle: 'italic', color: '#666'}}>No images for this step. Add at least one image.</div>
-                                )}
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ fontStyle: 'italic', color: '#666' }}>No images for this step. Add at least one image.</div>
+                              )}
                             </div>
                           </li>
                         ))}
                       </ul>
-                      
+
                       <div className={styles['stage-actions']}>
                         {project.workflow_stage === 2 && (
                           <>
                             <button className={`${styles['btn']} ${styles['primary']}`} onClick={() => setShowAddStepModal(true)} title="Add a construction step">
                               <i className="fas fa-plus"></i> Add Step
                             </button>
-                            <button 
-                              className={`${styles['btn']} ${project.steps.length > 0 && isAllStepsHaveImages ? styles['primary'] : styles['secondary']}`} 
+                            <button
+                              className={`${styles['btn']} ${project.steps.length > 0 && isAllStepsHaveImages ? styles['primary'] : styles['secondary']}`}
                               onClick={handleProceedToShare}
-                              disabled={project.steps.length === 0 || !isAllStepsHaveImages} 
+                              disabled={project.steps.length === 0 || !isAllStepsHaveImages}
                               title={project.steps.length > 0 && isAllStepsHaveImages ? 'Proceed to Share' : 'Cannot proceed until all steps have images'}
-                              style={{ 
-                                opacity: project.steps.length > 0 && isAllStepsHaveImages ? 1 : 0.5, 
-                                cursor: project.steps.length > 0 && isAllStepsHaveImages ? 'pointer' : 'not-allowed', 
-                                marginLeft: '10px' 
+                              style={{
+                                opacity: project.steps.length > 0 && isAllStepsHaveImages ? 1 : 0.5,
+                                cursor: project.steps.length > 0 && isAllStepsHaveImages ? 'pointer' : 'not-allowed',
+                                marginLeft: '10px'
                               }}
                             >
                               Proceed
                             </button>
-                            
+
                             <div className={styles['validation-status']}>
-                                <div className={styles['validation-item']}>
-                                    {project.steps.length > 0 ? (
-                                        <i className="fas fa-check-circle" style={{color: '#28a745'}}></i>
-                                    ) : (
-                                        <i className="fas fa-times-circle" style={{color: '#dc3545'}}></i>
-                                    )}
-                                    <span style={{color: project.steps.length > 0 ? '#28a745' : '#dc3545'}}>
-                                        At least one step added
-                                    </span>
-                                </div>
-                                <div className={styles['validation-item']}>
-                                    {isAllStepsHaveImages ? (
-                                        <i className="fas fa-check-circle" style={{color: '#28a745'}}></i>
-                                    ) : (
-                                        <i className="fas fa-times-circle" style={{color: '#dc3545'}}></i>
-                                    )}
-                                    <span style={{color: isAllStepsHaveImages ? '#28a745' : '#dc3545'}}>
-                                        All steps have images
-                                    </span>
-                                </div>
-                                {!isAllStepsHaveImages && project.steps.length > 0 && (
-                                    <div style={{fontWeight: 'bold', color: '#dc3545'}}>
-                                        {project.steps.filter(s => !s.images || s.images.length === 0).map(s => `Step ${s.step_number}: Needs images`).join(', ')}
-                                    </div>
+                              <div className={styles['validation-item']}>
+                                {project.steps.length > 0 ? (
+                                  <i className="fas fa-check-circle" style={{ color: '#28a745' }}></i>
+                                ) : (
+                                  <i className="fas fa-times-circle" style={{ color: '#dc3545' }}></i>
                                 )}
+                                <span style={{ color: project.steps.length > 0 ? '#28a745' : '#dc3545' }}>
+                                  At least one step added
+                                </span>
+                              </div>
+                              <div className={styles['validation-item']}>
+                                {isAllStepsHaveImages ? (
+                                  <i className="fas fa-check-circle" style={{ color: '#28a745' }}></i>
+                                ) : (
+                                  <i className="fas fa-times-circle" style={{ color: '#dc3545' }}></i>
+                                )}
+                                <span style={{ color: isAllStepsHaveImages ? '#28a745' : '#dc3545' }}>
+                                  All steps have images
+                                </span>
+                              </div>
+                              {!isAllStepsHaveImages && project.steps.length > 0 && (
+                                <div style={{ fontWeight: 'bold', color: '#dc3545' }}>
+                                  {project.steps.filter(s => !s.images || s.images.length === 0).map(s => `Step ${s.step_number}: Needs images`).join(', ')}
+                                </div>
+                              )}
                             </div>
                           </>
                         )}
@@ -1420,7 +1465,7 @@ export default function ProjectDetailsPage() {
                         </div>
                       )}
                     </div>
-                    
+
                     {project.status === 'completed' ? (
                       // Completion View
                       <div className={styles['stage-content']} style={{ textAlign: 'center' }}>
@@ -1433,10 +1478,10 @@ export default function ProjectDetailsPage() {
                           </p>
                         </div>
 
-                        <div style={{ 
-                          backgroundColor: '#f8f9fa', 
-                          padding: '20px', 
-                          borderRadius: '8px', 
+                        <div style={{
+                          backgroundColor: '#f8f9fa',
+                          padding: '20px',
+                          borderRadius: '8px',
                           marginBottom: '30px',
                           display: 'inline-block',
                           minWidth: '300px'
@@ -1454,14 +1499,14 @@ export default function ProjectDetailsPage() {
                         </div>
 
                         <div className={styles['stage-actions']} style={{ gap: '10px' }}>
-                          <button 
+                          <button
                             className={`${styles['btn']} ${styles['primary']}`}
                             onClick={handleOpenEditPrivacyModal}
                             title="Edit privacy settings"
                           >
                             <i className="fas fa-edit"></i> {project.visibility === 'public' ? 'Shared to Community' : 'Keep Private'}
                           </button>
-                          <button 
+                          <button
                             className={`${styles['btn']} ${styles['danger']}`}
                             onClick={handleDeleteProject}
                             title="Delete this project permanently"
@@ -1480,12 +1525,12 @@ export default function ProjectDetailsPage() {
                               {project.description}
                             </div>
                           </div>
-                          
+
                           <div className={styles['form-group']}>
                             <label>Final Project Image *</label>
-                            <div 
+                            <div
                               className={styles['final-image-upload-area']}
-                              style={{ 
+                              style={{
                                 border: `2px dashed ${isDragging ? '#2e8b57' : '#007bff'}`,
                                 backgroundColor: isDragging ? '#f0fff4' : '#f8f9fa'
                               }}
@@ -1494,10 +1539,10 @@ export default function ProjectDetailsPage() {
                               onDragLeave={handleDragLeave}
                               onDrop={handleFinalImagesDrop}
                             >
-                              <input 
-                                type="file" 
-                                id="final-images-file" 
-                                style={{ display: 'none' }} 
+                              <input
+                                type="file"
+                                id="final-images-file"
+                                style={{ display: 'none' }}
                                 accept="image/*"
                                 multiple
                                 onChange={handleFinalImagesFileChange}
@@ -1508,24 +1553,24 @@ export default function ProjectDetailsPage() {
                             </div>
 
                             {finalImages.length > 0 && (
-                               <div className={styles['images-preview']}>
-                                 {finalImages.map((img, index) => (
-                                   <div key={index} className={styles['image-preview']}>
-                                     <img src={img} alt={`Final Preview ${index}`} />
-                                     <button 
-                                       className={styles['remove-image-btn']}
-                                       onClick={() => handleRemoveFinalImage(index)}
-                                     >
-                                       <i className="fas fa-times"></i>
-                                     </button>
-                                   </div>
-                                 ))}
-                               </div>
+                              <div className={styles['images-preview']}>
+                                {finalImages.map((img, index) => (
+                                  <div key={index} className={styles['image-preview']}>
+                                    <img src={img} alt={`Final Preview ${index}`} />
+                                    <button
+                                      className={styles['remove-image-btn']}
+                                      onClick={() => handleRemoveFinalImage(index)}
+                                    >
+                                      <i className="fas fa-times"></i>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
                             )}
                           </div>
-                          
+
                           <div className={styles['share-options']}>
-                            <div 
+                            <div
                               className={`${styles['share-option']} ${shareOption === 'private' ? styles.selected : ''}`}
                               onClick={() => setShareOption('private')}
                             >
@@ -1533,7 +1578,7 @@ export default function ProjectDetailsPage() {
                               <div className={styles['share-option-title']}>Keep Private</div>
                               <div className={styles['share-option-description']}>Only you can view this project</div>
                             </div>
-                            <div 
+                            <div
                               className={`${styles['share-option']} ${shareOption === 'community' ? styles.selected : ''}`}
                               onClick={() => setShareOption('community')}
                             >
@@ -1542,7 +1587,7 @@ export default function ProjectDetailsPage() {
                               <div className={styles['share-option-description']}>Share with other EcoWaste users</div>
                             </div>
                           </div>
-                          
+
                           <div className={styles['materials-summary']}>
                             <div className={styles['summary-title']}>Materials Used</div>
                             <ul className={styles['summary-list']}>
@@ -1555,9 +1600,9 @@ export default function ProjectDetailsPage() {
                             </ul>
                           </div>
                         </div>
-                        
+
                         <div className={styles['stage-actions']}>
-                          <button 
+                          <button
                             className={`${styles['btn']} ${shareOption === 'private' ? styles['primary'] : styles['secondary']}`}
                             onClick={handleShareProject}
                             disabled={shareOption !== 'private'}
@@ -1565,7 +1610,7 @@ export default function ProjectDetailsPage() {
                           >
                             Keep Private
                           </button>
-                          <button 
+                          <button
                             className={`${styles['btn']} ${shareOption === 'community' ? styles['primary'] : styles['secondary']}`}
                             onClick={handleShareProject}
                             disabled={shareOption !== 'community' || finalImages.length === 0}
@@ -1634,16 +1679,16 @@ export default function ProjectDetailsPage() {
               <div className={styles['modal-body']}>
                 <div className={styles['form-group']}>
                   <label>Step Title *</label>
-                  <input 
-                    type="text" 
-                    placeholder="Enter step title" 
+                  <input
+                    type="text"
+                    placeholder="Enter step title"
                     value={newStepTitle}
                     onChange={(e) => setNewStepTitle(e.target.value)}
                   />
                 </div>
                 <div className={styles['form-group']}>
                   <label>Description *</label>
-                  <textarea 
+                  <textarea
                     placeholder="Describe what needs to be done..."
                     value={newStepDescription}
                     onChange={(e) => setNewStepDescription(e.target.value)}
@@ -1652,7 +1697,7 @@ export default function ProjectDetailsPage() {
               </div>
               <div className={styles['modal-actions']}>
                 <button className={styles['action-btn']} onClick={() => setShowAddStepModal(false)}>Cancel</button>
-                <button 
+                <button
                   className={`${styles['action-btn']} ${styles['check-btn']}`}
                   onClick={handleAddStep}
                   disabled={!newStepTitle.trim() || !newStepDescription.trim()}
@@ -1710,42 +1755,42 @@ export default function ProjectDetailsPage() {
                 {((selectedMaterial.acquired || 0) + parseInt(checklistQuantity || '0')) >= (selectedMaterial.needed || 0) && (
                   <div className={styles['form-group']}>
                     <label>Evidence Photo *</label>
-                    <div 
-                       className={styles['file-drop-area']}
-                       style={{ 
-                         border: `2px dashed ${isDragging ? '#2e8b57' : '#ccc'}`, 
-                         padding: '20px', 
-                         textAlign: 'center', 
-                         cursor: 'pointer',
-                         backgroundColor: isDragging ? '#f0fff4' : 'transparent'
-                       }}
-                       onClick={() => document.getElementById('checklist-file')?.click()}
-                       onDragOver={handleDragOver}
-                       onDragLeave={handleDragLeave}
-                       onDrop={handleDrop}
-                     >
-                       <input 
-                         type="file" 
-                         id="checklist-file" 
-                         style={{ display: 'none' }} 
-                         accept="image/*"
-                         onChange={handleFileChange}
-                       />
-                       {checklistFile ? (
-                         <div style={{ position: 'relative', width: '100%', height: '150px' }}>
-                           <img 
-                             src={checklistFile} 
-                             alt="Evidence" 
-                             style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                           />
-                         </div>
-                       ) : (
-                         <>
-                           <i className="fas fa-cloud-upload-alt" style={{ fontSize: '24px', marginBottom: '10px' }}></i>
-                           <p>Drag & Drop or Click to Upload</p>
-                         </>
-                       )}
-                     </div>
+                    <div
+                      className={styles['file-drop-area']}
+                      style={{
+                        border: `2px dashed ${isDragging ? '#2e8b57' : '#ccc'}`,
+                        padding: '20px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        backgroundColor: isDragging ? '#f0fff4' : 'transparent'
+                      }}
+                      onClick={() => document.getElementById('checklist-file')?.click()}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
+                      <input
+                        type="file"
+                        id="checklist-file"
+                        style={{ display: 'none' }}
+                        accept="image/*"
+                        onChange={handleFileChange}
+                      />
+                      {checklistFile ? (
+                        <div style={{ position: 'relative', width: '100%', height: '150px' }}>
+                          <img
+                            src={checklistFile}
+                            alt="Evidence"
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <i className="fas fa-cloud-upload-alt" style={{ fontSize: '24px', marginBottom: '10px' }}></i>
+                          <p>Drag & Drop or Click to Upload</p>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1757,8 +1802,8 @@ export default function ProjectDetailsPage() {
               <div className={styles['modal-actions']}>
                 <button className={styles['action-btn']} onClick={handleCloseChecklistModal}>Cancel</button>
                 <button type="button" className={`${styles['action-btn']} ${styles['check-btn']}`} onClick={handleHaveAll}>Have All</button>
-                <button 
-                  className={`${styles['action-btn']} ${styles['check-btn']}`} 
+                <button
+                  className={`${styles['action-btn']} ${styles['check-btn']}`}
                   onClick={handleChecklistSubmit}
                   disabled={isUploading || ((((selectedMaterial.acquired || 0) + parseInt(checklistQuantity || '0')) >= (selectedMaterial.needed || 0)) && !checklistFile)}
                 >
@@ -1780,12 +1825,12 @@ export default function ProjectDetailsPage() {
               <div className={styles['modal-body']}>
                 <div className={styles['form-group']}>
                   <label>Evidence Photo *</label>
-                  <div 
+                  <div
                     className={styles['file-drop-area']}
-                    style={{ 
-                      border: `2px dashed ${isDragging ? '#2e8b57' : '#ccc'}`, 
-                      padding: '30px', 
-                      textAlign: 'center', 
+                    style={{
+                      border: `2px dashed ${isDragging ? '#2e8b57' : '#ccc'}`,
+                      padding: '30px',
+                      textAlign: 'center',
                       cursor: 'pointer',
                       backgroundColor: isDragging ? '#f0fff4' : 'transparent',
                       borderRadius: '8px'
@@ -1795,19 +1840,19 @@ export default function ProjectDetailsPage() {
                     onDragLeave={handleDragLeave}
                     onDrop={handleUploadPhotoDrop}
                   >
-                    <input 
-                      type="file" 
-                      id="upload-photo-file" 
-                      style={{ display: 'none' }} 
+                    <input
+                      type="file"
+                      id="upload-photo-file"
+                      style={{ display: 'none' }}
                       accept="image/*"
                       onChange={handleUploadPhotoFileChange}
                     />
                     {uploadPhotoFile ? (
                       <div style={{ position: 'relative', width: '100%', height: '200px' }}>
-                        <img 
-                          src={uploadPhotoFile} 
-                          alt="Preview" 
-                          style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                        <img
+                          src={uploadPhotoFile}
+                          alt="Preview"
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                         />
                       </div>
                     ) : (
@@ -1823,8 +1868,8 @@ export default function ProjectDetailsPage() {
               </div>
               <div className={styles['modal-actions']}>
                 <button className={styles['action-btn']} onClick={handleCloseUploadPhotoModal}>Cancel</button>
-                <button 
-                  className={`${styles['action-btn']} ${styles['check-btn']}`} 
+                <button
+                  className={`${styles['action-btn']} ${styles['check-btn']}`}
                   onClick={handleUploadPhotoSubmit}
                   disabled={isUploadingPhoto || !uploadPhotoFile}
                 >
@@ -1846,18 +1891,18 @@ export default function ProjectDetailsPage() {
               <div className={styles['modal-body']}>
                 <div className={styles['form-group']}>
                   <label>Project Title *</label>
-                  <input 
-                    type="text" 
-                    value={editTitle} 
-                    onChange={(e) => setEditTitle(e.target.value)} 
-                    placeholder="Enter project title" 
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    placeholder="Enter project title"
                   />
                 </div>
                 <div className={styles['form-group']}>
                   <label>Description *</label>
-                  <textarea 
-                    value={editDescription} 
-                    onChange={(e) => setEditDescription(e.target.value)} 
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
                     placeholder="Describe your project..."
                     style={{ minHeight: '100px' }}
                   ></textarea>
@@ -1865,7 +1910,7 @@ export default function ProjectDetailsPage() {
               </div>
               <div className={styles['modal-actions']}>
                 <button className={styles['action-btn']} onClick={() => setShowEditProjectModal(false)}>Cancel</button>
-                <button 
+                <button
                   className={`${styles['action-btn']} ${styles['check-btn']}`}
                   onClick={handleUpdateProject}
                   disabled={!editTitle.trim() || !editDescription.trim()}
@@ -1888,18 +1933,18 @@ export default function ProjectDetailsPage() {
               <div className={styles['modal-body']}>
                 <div className={styles['form-group']}>
                   <label>Step Title *</label>
-                  <input 
-                    type="text" 
-                    value={editStepTitle} 
-                    onChange={(e) => setEditStepTitle(e.target.value)} 
-                    placeholder="Enter step title" 
+                  <input
+                    type="text"
+                    value={editStepTitle}
+                    onChange={(e) => setEditStepTitle(e.target.value)}
+                    placeholder="Enter step title"
                   />
                 </div>
                 <div className={styles['form-group']}>
                   <label>Description *</label>
-                  <textarea 
-                    value={editStepDescription} 
-                    onChange={(e) => setEditStepDescription(e.target.value)} 
+                  <textarea
+                    value={editStepDescription}
+                    onChange={(e) => setEditStepDescription(e.target.value)}
                     placeholder="Describe this step..."
                     style={{ minHeight: '100px' }}
                   ></textarea>
@@ -1907,7 +1952,7 @@ export default function ProjectDetailsPage() {
               </div>
               <div className={styles['modal-actions']}>
                 <button className={styles['action-btn']} onClick={handleCloseEditStepModal}>Cancel</button>
-                <button 
+                <button
                   className={`${styles['action-btn']} ${styles['check-btn']}`}
                   onClick={handleUpdateStep}
                   disabled={!editStepTitle.trim() || !editStepDescription.trim()}
@@ -1928,52 +1973,52 @@ export default function ProjectDetailsPage() {
                 <button className={styles['close-modal']} onClick={() => setShowAddImagesModal(false)}>×</button>
               </div>
               <div className={styles['modal-body']}>
-                <div 
-                   className={styles['file-drop-area']}
-                   style={{ 
-                     border: `2px dashed ${isDragging ? '#2e8b57' : '#ccc'}`, 
-                     padding: '20px', 
-                     textAlign: 'center', 
-                     cursor: 'pointer',
-                     backgroundColor: isDragging ? '#f0fff4' : 'transparent',
-                     marginBottom: '20px'
-                   }}
-                   onClick={() => document.getElementById('step-images-file')?.click()}
-                   onDragOver={handleDragOver}
-                   onDragLeave={handleDragLeave}
-                   onDrop={handleStepImagesDrop}
-                 >
-                   <input 
-                     type="file" 
-                     id="step-images-file" 
-                     style={{ display: 'none' }} 
-                     accept="image/*"
-                     multiple
-                     onChange={handleStepImagesFileChange}
-                   />
-                   <i className="fas fa-cloud-upload-alt" style={{ fontSize: '24px', marginBottom: '10px' }}></i>
-                   <p>Drag & Drop or Click to Upload Multiple Images</p>
-                 </div>
+                <div
+                  className={styles['file-drop-area']}
+                  style={{
+                    border: `2px dashed ${isDragging ? '#2e8b57' : '#ccc'}`,
+                    padding: '20px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    backgroundColor: isDragging ? '#f0fff4' : 'transparent',
+                    marginBottom: '20px'
+                  }}
+                  onClick={() => document.getElementById('step-images-file')?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleStepImagesDrop}
+                >
+                  <input
+                    type="file"
+                    id="step-images-file"
+                    style={{ display: 'none' }}
+                    accept="image/*"
+                    multiple
+                    onChange={handleStepImagesFileChange}
+                  />
+                  <i className="fas fa-cloud-upload-alt" style={{ fontSize: '24px', marginBottom: '10px' }}></i>
+                  <p>Drag & Drop or Click to Upload Multiple Images</p>
+                </div>
 
-                 {stepImages.length > 0 && (
-                   <div className={styles['images-preview']}>
-                     {stepImages.map((img, index) => (
-                       <div key={index} className={styles['image-preview']}>
-                         <img src={img} alt={`Preview ${index}`} />
-                         <button 
-                           className={styles['remove-image-btn']}
-                           onClick={() => handleRemoveStepImage(index)}
-                         >
-                           <i className="fas fa-times"></i>
-                         </button>
-                       </div>
-                     ))}
-                   </div>
-                 )}
+                {stepImages.length > 0 && (
+                  <div className={styles['images-preview']}>
+                    {stepImages.map((img, index) => (
+                      <div key={index} className={styles['image-preview']}>
+                        <img src={img} alt={`Preview ${index}`} />
+                        <button
+                          className={styles['remove-image-btn']}
+                          onClick={() => handleRemoveStepImage(index)}
+                        >
+                          <i className="fas fa-times"></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className={styles['modal-actions']}>
                 <button className={styles['action-btn']} onClick={() => setShowAddImagesModal(false)}>Cancel</button>
-                <button 
+                <button
                   className={`${styles['action-btn']} ${styles['check-btn']}`}
                   onClick={handleSaveStepImages}
                   disabled={stepImages.length === 0}
@@ -1996,7 +2041,7 @@ export default function ProjectDetailsPage() {
               <div className={styles['modal-body']}>
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold' }}>Project Visibility</label>
-                  <div 
+                  <div
                     onClick={() => setEditPrivacyOption('private')}
                     style={{
                       padding: '15px',
@@ -2012,7 +2057,7 @@ export default function ProjectDetailsPage() {
                     </div>
                     <div style={{ fontSize: '0.9rem', color: '#666' }}>Only you can view this project</div>
                   </div>
-                  <div 
+                  <div
                     onClick={() => setEditPrivacyOption('public')}
                     style={{
                       padding: '15px',
@@ -2031,7 +2076,7 @@ export default function ProjectDetailsPage() {
               </div>
               <div className={styles['modal-actions']}>
                 <button className={styles['action-btn']} onClick={handleCloseEditPrivacyModal}>Cancel</button>
-                <button 
+                <button
                   className={`${styles['action-btn']} ${styles['check-btn']}`}
                   onClick={handleUpdateProjectPrivacy}
                   disabled={!editPrivacyOption}
@@ -2049,77 +2094,77 @@ export default function ProjectDetailsPage() {
       </div>
 
       {/* Feedback Button */}
-            <div className={styles.feedbackBtn} onClick={() => setIsFeedbackOpen(true)}>💬</div>
-      
-            {/* Feedback Modal */}
-            {isFeedbackOpen && (
-              <div className={styles.feedbackModal} onClick={(e) => {
-                if (e.target === e.currentTarget) setIsFeedbackOpen(false);
-              }}>
-                <div className={styles.feedbackContent}>
-                  <span className={styles.feedbackCloseBtn} onClick={() => setIsFeedbackOpen(false)}>×</span>
-                  
-                  {!submitSuccess ? (
-                    <div className={styles.feedbackForm}>
-                      <h3>Share Your Feedback</h3>
-                      <div className={styles.emojiRating}>
-                        {[
-                          { r: 1, e: '😞', l: 'Very Sad' },
-                          { r: 2, e: '😕', l: 'Sad' },
-                          { r: 3, e: '😐', l: 'Neutral' },
-                          { r: 4, e: '🙂', l: 'Happy' },
-                          { r: 5, e: '😍', l: 'Very Happy' }
-                        ].map((option) => (
-                          <div 
-                            key={option.r} 
-                            className={`${styles.emojiOption} ${rating === option.r ? styles.selected : ''}`}
-                            onClick={() => {
-                              setRating(option.r);
-                              setRatingError(false);
-                            }}
-                          >
-                            <span className={styles.emoji}>{option.e}</span>
-                            <span className={styles.emojiLabel}>{option.l}</span>
-                          </div>
-                        ))}
-                      </div>
-                      {ratingError && <div className={styles.errorMessage} style={{display: 'block'}}>Please select a rating</div>}
-                      
-                      <p className={styles.feedbackDetail}>Please share in detail what we can improve more?</p>
-                      <textarea 
-                        placeholder="Your feedback helps us make EcoWaste better..."
-                        value={feedbackText}
-                        onChange={(e) => {
-                          setFeedbackText(e.target.value);
-                          setTextError(false);
-                        }}
-                      ></textarea>
-                      {textError && <div className={styles.errorMessage} style={{display: 'block'}}>Please provide your feedback</div>}
-                      
-                      <button 
-                        type="submit" 
-                        className={styles.feedbackSubmitBtn} 
-                        onClick={handleFeedbackSubmit}
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            Submitting... <div className={styles.spinner}></div>
-                          </>
-                        ) : 'Submit Feedback'}
-                      </button>
+      <div className={styles.feedbackBtn} onClick={() => setIsFeedbackOpen(true)}>💬</div>
+
+      {/* Feedback Modal */}
+      {isFeedbackOpen && (
+        <div className={styles.feedbackModal} onClick={(e) => {
+          if (e.target === e.currentTarget) setIsFeedbackOpen(false);
+        }}>
+          <div className={styles.feedbackContent}>
+            <span className={styles.feedbackCloseBtn} onClick={() => setIsFeedbackOpen(false)}>×</span>
+
+            {!submitSuccess ? (
+              <div className={styles.feedbackForm}>
+                <h3>Share Your Feedback</h3>
+                <div className={styles.emojiRating}>
+                  {[
+                    { r: 1, e: '😞', l: 'Very Sad' },
+                    { r: 2, e: '😕', l: 'Sad' },
+                    { r: 3, e: '😐', l: 'Neutral' },
+                    { r: 4, e: '🙂', l: 'Happy' },
+                    { r: 5, e: '😍', l: 'Very Happy' }
+                  ].map((option) => (
+                    <div
+                      key={option.r}
+                      className={`${styles.emojiOption} ${rating === option.r ? styles.selected : ''}`}
+                      onClick={() => {
+                        setRating(option.r);
+                        setRatingError(false);
+                      }}
+                    >
+                      <span className={styles.emoji}>{option.e}</span>
+                      <span className={styles.emojiLabel}>{option.l}</span>
                     </div>
-                  ) : (
-                    <div className={styles.thankYouMessage} style={{display: 'block'}}>
-                      <span className={styles.thankYouEmoji}>🎉</span>
-                      <h3>Thank You!</h3>
-                      <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
-                      <p>Your opinion matters to us!</p>
-                    </div>
-                  )}
+                  ))}
                 </div>
+                {ratingError && <div className={styles.errorMessage} style={{ display: 'block' }}>Please select a rating</div>}
+
+                <p className={styles.feedbackDetail}>Please share in detail what we can improve more?</p>
+                <textarea
+                  placeholder="Your feedback helps us make EcoWaste better..."
+                  value={feedbackText}
+                  onChange={(e) => {
+                    setFeedbackText(e.target.value);
+                    setTextError(false);
+                  }}
+                ></textarea>
+                {textError && <div className={styles.errorMessage} style={{ display: 'block' }}>Please provide your feedback</div>}
+
+                <button
+                  type="submit"
+                  className={styles.feedbackSubmitBtn}
+                  onClick={handleFeedbackSubmit}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      Submitting... <div className={styles.spinner}></div>
+                    </>
+                  ) : 'Submit Feedback'}
+                </button>
+              </div>
+            ) : (
+              <div className={styles.thankYouMessage} style={{ display: 'block' }}>
+                <span className={styles.thankYouEmoji}>🎉</span>
+                <h3>Thank You!</h3>
+                <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
+                <p>Your opinion matters to us!</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
     </ProtectedRoute>
   );
 }

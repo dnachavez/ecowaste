@@ -10,6 +10,18 @@ import { ref, onValue, update, remove, get } from 'firebase/database';
 import { useAuth } from '../../../context/AuthContext';
 import { incrementAction } from '../../../lib/gamification';
 
+interface UserData {
+  fullName?: string;
+  displayName?: string;
+  email?: string;
+}
+
+interface DonationData {
+  category?: string;
+  description?: string;
+  quantity?: string;
+}
+
 interface Request {
   id: string;
   donationId: string;
@@ -21,13 +33,13 @@ interface Request {
   pickupDate?: string;
   deliveryDate?: string;
   createdAt: number;
-  requesterName?: string; // Optional, might need to fetch
-  donationTitle?: string; // Optional
 }
 
 export default function RequestsManagement() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<Request[]>([]);
+  const [usersData, setUsersData] = useState<Record<string, UserData>>({});
+  const [donationsData, setDonationsData] = useState<Record<string, DonationData>>({});
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentRequest, setCurrentRequest] = useState<Request | null>(null);
@@ -35,16 +47,35 @@ export default function RequestsManagement() {
   useEffect(() => {
     if (!user) return;
 
+    // Fetch Users
+    const usersRef = ref(db, 'users');
+    onValue(usersRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setUsersData(snapshot.val());
+      }
+    });
+
+    // Fetch Donations
+    const donationsRef = ref(db, 'donations');
+    onValue(donationsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setDonationsData(snapshot.val());
+      }
+    });
+
+    // Fetch Requests
     const requestsRef = ref(db, 'requests');
     const unsubscribe = onValue(requestsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const requestsList = Object.entries(data).map(([key, value]) => {
-            const val = value as Omit<Request, 'id'>;
-            return {
-                id: key,
-                ...val
-            };
+          const val = value as any;
+          return {
+            id: key,
+            ...val,
+            // Handle potential missing quantityClaim by checking quantity
+            quantityClaim: val.quantityClaim || val.quantity || 0
+          };
         });
         setRequests(requestsList.reverse());
       } else {
@@ -62,15 +93,15 @@ export default function RequestsManagement() {
   };
 
   const handleDeleteRequest = async (requestId: string) => {
-      if (confirm('Are you sure you want to delete this request? This action cannot be undone.')) {
-        try {
-          await remove(ref(db, `requests/${requestId}`));
-          alert('Request deleted successfully');
-        } catch (error) {
-          console.error('Error deleting request:', error);
-          alert('Failed to delete request');
-        }
+    if (confirm('Are you sure you want to delete this request? This action cannot be undone.')) {
+      try {
+        await remove(ref(db, `requests/${requestId}`));
+        alert('Request deleted successfully');
+      } catch (error) {
+        console.error('Error deleting request:', error);
+        alert('Failed to delete request');
       }
+    }
   };
 
   const handleSaveRequest = async (e: React.FormEvent) => {
@@ -87,21 +118,21 @@ export default function RequestsManagement() {
         status: currentRequest.status,
         deliveryStatus: currentRequest.deliveryStatus || ''
       };
-      
+
       // If status is completed, force deliveryStatus to Delivered if not set manually
       if (currentRequest.status === 'completed') {
-          updates.deliveryStatus = 'Delivered';
-          if (!updates.deliveryDate) {
-              updates.deliveryDate = new Date().toISOString();
-          }
+        updates.deliveryStatus = 'Delivered';
+        if (!updates.deliveryDate) {
+          updates.deliveryDate = new Date().toISOString();
+        }
       }
 
       const requestRef = ref(db, `requests/${currentRequest.id}`);
       await update(requestRef, updates);
 
       if (isCompleting) {
-          // Award XP to donor
-          await incrementAction(currentRequest.ownerId, 'donate', 1);
+        // Award XP to donor
+        await incrementAction(currentRequest.ownerId, 'donate', 1);
       }
 
       setIsEditModalOpen(false);
@@ -114,13 +145,13 @@ export default function RequestsManagement() {
 
   return (
     <AdminRoute>
-        <Header />
+      <Header />
 
-        <div className={styles.container}>
+      <div className={styles.container}>
         <AdminSidebar />
         <main className={styles.mainContent}>
           <h1 className={styles.title}>Manage Requests</h1>
-          
+
           {loading ? (
             <p>Loading requests...</p>
           ) : (
@@ -128,8 +159,9 @@ export default function RequestsManagement() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>Donation ID</th>
-                    <th>Requester ID</th>
+                    <th>Donator</th>
+                    <th>Requester</th>
+                    <th>Solid Waste</th>
                     <th>Quantity</th>
                     <th>Status</th>
                     <th>Delivery Status</th>
@@ -139,36 +171,46 @@ export default function RequestsManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {requests.map(request => (
-                    <tr key={request.id}>
-                      <td>{request.donationId}</td>
-                      <td>{request.requesterId}</td>
-                      <td>{request.quantityClaim}</td>
-                      <td>{request.status}</td>
-                      <td>{request.deliveryStatus || '-'}</td>
-                      <td>{request.pickupDate || 'N/A'}</td>
-                      <td>{request.deliveryDate || 'N/A'}</td>
-                      <td>
-                        <button 
-                          className={`${styles.actionBtn} ${styles.editBtn}`}
-                          onClick={() => handleEditClick(request)}
-                          title="Edit Dates"
-                        >
-                          <i className="fas fa-edit"></i>
-                        </button>
-                        <button 
-                          className={`${styles.actionBtn} ${styles.deleteBtn}`}
-                          onClick={() => handleDeleteRequest(request.id)}
-                          title="Delete Request"
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {requests.map(request => {
+                    const donator = usersData[request.ownerId]?.fullName || usersData[request.ownerId]?.displayName || 'Unknown';
+                    const requester = usersData[request.requesterId]?.fullName || usersData[request.requesterId]?.displayName || 'Unknown';
+                    const donation = donationsData[request.donationId];
+                    const solidWaste = donation
+                      ? `${donation.category || 'Unknown'} - ${donation.description || ''}`
+                      : 'Unknown Item';
+
+                    return (
+                      <tr key={request.id}>
+                        <td>{donator}</td>
+                        <td>{requester}</td>
+                        <td>{solidWaste}</td>
+                        <td>{request.quantityClaim}</td>
+                        <td>{request.status}</td>
+                        <td>{request.deliveryStatus || '-'}</td>
+                        <td>{request.pickupDate || 'N/A'}</td>
+                        <td>{request.deliveryDate || 'N/A'}</td>
+                        <td>
+                          <button
+                            className={`${styles.actionBtn} ${styles.editBtn}`}
+                            onClick={() => handleEditClick(request)}
+                            title="Edit Dates"
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                          <button
+                            className={`${styles.actionBtn} ${styles.deleteBtn}`}
+                            onClick={() => handleDeleteRequest(request.id)}
+                            title="Delete Request"
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {requests.length === 0 && (
                     <tr>
-                      <td colSpan={8} style={{textAlign: 'center', padding: '20px'}}>No requests found</td>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '20px' }}>No requests found</td>
                     </tr>
                   )}
                 </tbody>
@@ -183,9 +225,9 @@ export default function RequestsManagement() {
                 <form onSubmit={handleSaveRequest}>
                   <div className={styles.formGroup}>
                     <label>Status</label>
-                    <select 
+                    <select
                       value={currentRequest.status}
-                      onChange={e => setCurrentRequest({...currentRequest, status: e.target.value})}
+                      onChange={e => setCurrentRequest({ ...currentRequest, status: e.target.value })}
                     >
                       <option value="pending">Pending</option>
                       <option value="approved">Approved</option>
@@ -195,9 +237,9 @@ export default function RequestsManagement() {
                   </div>
                   <div className={styles.formGroup}>
                     <label>Delivery Status</label>
-                    <select 
+                    <select
                       value={currentRequest.deliveryStatus || ''}
-                      onChange={e => setCurrentRequest({...currentRequest, deliveryStatus: e.target.value})}
+                      onChange={e => setCurrentRequest({ ...currentRequest, deliveryStatus: e.target.value })}
                     >
                       <option value="">Select Status</option>
                       <option value="Pending Item">Pending Item</option>
@@ -210,18 +252,18 @@ export default function RequestsManagement() {
                   </div>
                   <div className={styles.formGroup}>
                     <label>Pickup Date</label>
-                    <input 
-                      type="date" 
-                      value={currentRequest.pickupDate || ''} 
-                      onChange={e => setCurrentRequest({...currentRequest, pickupDate: e.target.value})}
+                    <input
+                      type="date"
+                      value={currentRequest.pickupDate || ''}
+                      onChange={e => setCurrentRequest({ ...currentRequest, pickupDate: e.target.value })}
                     />
                   </div>
                   <div className={styles.formGroup}>
                     <label>Delivery Date</label>
-                    <input 
-                      type="date" 
-                      value={currentRequest.deliveryDate || ''} 
-                      onChange={e => setCurrentRequest({...currentRequest, deliveryDate: e.target.value})}
+                    <input
+                      type="date"
+                      value={currentRequest.deliveryDate || ''}
+                      onChange={e => setCurrentRequest({ ...currentRequest, deliveryDate: e.target.value })}
                     />
                   </div>
                   <div className={styles.modalActions}>
