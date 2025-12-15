@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import styles from './Sidebar.module.css';
+import styles from './AdminSidebar.module.css';
 
 export default function AdminSidebar() {
   const pathname = usePathname();
