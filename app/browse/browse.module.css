@@ -160,7 +160,7 @@
   min-height: calc(100vh - 90px);
   overflow: visible;
   padding: 20px;
-  background-color: #fff;
+  background-color: #fbfbfbff;
 }
 
 .searchBar {
@@ -169,6 +169,7 @@
 .searchBar form {
   display: flex;
   gap: 10px;
+  background: white;
 }
 .searchBar input {
   flex: 1;
@@ -185,10 +186,6 @@
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-}
-
-.active {
-  /* Marker class for active state */
 }
 
 .tabContainer {
