@@ -44,6 +44,11 @@ export default function AdminSidebar() {
             </Link>
           </li>
           <li>
+            <Link href="/admin/feedback" className={isActive('/admin/feedback') ? styles.active : ''}>
+              <i className="fas fa-comment-dots"></i> Feedback
+            </Link>
+          </li>
+          <li>
             <Link href="/admin/tasks" className={isActive('/admin/tasks') && !isActive('/admin/tasks/create') ? styles.active : ''}>
               <i className="fas fa-tasks"></i> Manage Tasks
             </Link>
@@ -54,7 +59,7 @@ export default function AdminSidebar() {
             </Link>
           </li>
           <li>
-             <div style={{ borderTop: '1px solid #ddd', margin: '10px 0' }}></div>
+            <div style={{ borderTop: '1px solid #ddd', margin: '10px 0' }}></div>
           </li>
           <li>
             <Link href="/homepage">

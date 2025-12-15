@@ -15,7 +15,7 @@
   top: 90px;
   align-self: start;
   height: calc(100vh - 90px);
-  overflow: hidden;
+  overflow-y: auto;
   left: 0;
   border: 1px solid rgba(94, 147, 108, 0.3);
 }

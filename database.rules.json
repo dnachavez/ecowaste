@@ -2,7 +2,9 @@
   "rules": {
     "users": {
       ".read": "auth != null",
-      ".indexOn": ["role"],
+      ".indexOn": [
+        "role"
+      ],
       "$uid": {
         ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
       }
@@ -14,22 +16,41 @@
     "donations": {
       ".read": "auth != null",
       ".write": "auth != null",
-      ".indexOn": ["userId"]
+      ".indexOn": [
+        "userId"
+      ]
     },
     "projects": {
       ".read": "auth != null",
       ".write": "auth != null",
-      ".indexOn": ["authorId"]
+      ".indexOn": [
+        "authorId"
+      ]
     },
     "requests": {
       ".read": "auth != null",
       ".write": "auth != null",
-      ".indexOn": ["requesterId", "ownerId", "donationId"]
+      ".indexOn": [
+        "requesterId",
+        "ownerId",
+        "donationId"
+      ]
     },
     "notifications": {
       ".read": "auth != null",
       ".write": "auth != null",
-      ".indexOn": ["userId", "createdAt"]
+      ".indexOn": [
+        "userId",
+        "createdAt"
+      ]
+    },
+    "feedbacks": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": [
+        "rating",
+        "createdAt"
+      ]
     }
   }
 }

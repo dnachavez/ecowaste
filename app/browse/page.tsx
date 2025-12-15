@@ -136,7 +136,7 @@ function BrowseContent() {
   };
 
 
-  const handleFeedbackSubmit = (e: React.FormEvent) => {
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     let valid = true;
@@ -155,11 +155,22 @@ function BrowseContent() {
     }
 
     if (!valid) return;
+    if (!user) return;
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const feedbackRef = ref(db, 'feedbacks');
+      await push(feedbackRef, {
+        userId: user.uid,
+        userName: user.displayName || 'Anonymous',
+        userAvatar: user.photoURL || '',
+        rating,
+        text: feedbackText,
+        createdAt: Date.now(),
+        status: 'new'
+      });
+
       setIsSubmitting(false);
       setSubmitSuccess(true);
 
@@ -170,7 +181,11 @@ function BrowseContent() {
         setRating(0);
         setFeedbackText('');
       }, 3000);
-    }, 1500);
+    } catch (error) {
+      console.error("Error submitting feedback:", error);
+      setIsSubmitting(false);
+      alert("Failed to submit feedback.");
+    }
   };
 
   useEffect(() => {
