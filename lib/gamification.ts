@@ -35,10 +35,13 @@ export const BADGES: Record<string, Badge> = {
 
 export interface UserStats {
   xp: number;
+  ecoPoints: number; // Redeemable currency
   level: number;
   recyclingCount: number;
   donationCount: number;
   badges: string[]; // Array of badge IDs
+  unlockedBorders?: string[]; // IDs of unlocked avatar borders
+  equippedBorder?: string; // ID of currently equipped border
 }
 
 export const LEVEL_CAP = 50;
@@ -50,7 +53,7 @@ export const calculateLevel = (xp: number): number => {
   // 0-100: Lvl 1
   // 101-250: Lvl 2 (150 diff)
   // etc.
-  
+
   // Let's stick to simple: Level N requires (N-1) * 100 XP total?
   // No, let's say Level = 1 + floor(xp / 100).
   return 1 + Math.floor(xp / 100);
@@ -63,25 +66,28 @@ export const getNextLevelXp = (level: number): number => {
 export const awardXP = async (userId: string, amount: number) => {
   const userRef = ref(db, `users/${userId}`);
   const snapshot = await get(userRef);
-  
+
   if (!snapshot.exists()) return;
-  
+
   const userData = snapshot.val();
   const currentXP = userData.xp || 0;
+  const currentEcoPoints = userData.ecoPoints || 0;
   const currentLevel = userData.level || 1;
-  
+
   const newXP = currentXP + amount;
+  const newEcoPoints = currentEcoPoints + amount; // Add to redeemable points too
   const calculatedLevel = calculateLevel(newXP);
-  
+
   const updates: Record<string, number> = {
-    xp: newXP
+    xp: newXP,
+    ecoPoints: newEcoPoints
   };
 
   if (calculatedLevel > currentLevel) {
     updates.level = calculatedLevel;
     // Check for level-based badges
     if (calculatedLevel >= 5) {
-       await checkAndAwardBadge(userId, 'SIERRA_MADRE', userData.badges || []);
+      await checkAndAwardBadge(userId, 'SIERRA_MADRE', userData.badges || []);
     }
   }
 
@@ -92,65 +98,66 @@ export const awardXP = async (userId: string, amount: number) => {
 export const incrementAction = async (userId: string, action: 'recycle' | 'donate' | 'project', count: number = 1, customXp?: number) => {
   const userRef = ref(db, `users/${userId}`);
   const snapshot = await get(userRef);
-  
+
   if (!snapshot.exists()) return;
-  
+
   const userData = snapshot.val();
-  
+
   let currentCount = 0;
   let field = '';
-  
+
   if (action === 'recycle') {
-      currentCount = userData.recyclingCount || 0;
-      field = 'recyclingCount';
+    currentCount = userData.recyclingCount || 0;
+    field = 'recyclingCount';
   } else if (action === 'donate') {
-      currentCount = userData.donationCount || 0;
-      field = 'donationCount';
+    currentCount = userData.donationCount || 0;
+    field = 'donationCount';
   } else if (action === 'project') {
-      currentCount = userData.projectsCompleted || 0;
-      field = 'projectsCompleted';
+    currentCount = userData.projectsCompleted || 0;
+    field = 'projectsCompleted';
   }
-  
+
   const newCount = currentCount + count;
-  
+
   const updates: Record<string, number> = {
     [field]: newCount
   };
 
   // Award XP
   if (action !== 'project' || customXp !== undefined) {
-      let xpReward = 0;
-      if (customXp !== undefined) {
-          xpReward = customXp;
-      } else {
-          xpReward = action === 'recycle' ? 10 * count : 20 * count;
-      }
-      
-      updates.xp = (userData.xp || 0) + xpReward;
-      
-      const currentLevel = userData.level || 1;
-      const newLevel = calculateLevel(updates.xp);
-      if (newLevel > currentLevel) {
-          updates.level = newLevel;
-      }
+    let xpReward = 0;
+    if (customXp !== undefined) {
+      xpReward = customXp;
+    } else {
+      xpReward = action === 'recycle' ? 10 * count : 20 * count;
+    }
+
+    updates.xp = (userData.xp || 0) + xpReward;
+    updates.ecoPoints = (userData.ecoPoints || 0) + xpReward;
+
+    const currentLevel = userData.level || 1;
+    const newLevel = calculateLevel(updates.xp);
+    if (newLevel > currentLevel) {
+      updates.level = newLevel;
+    }
   }
 
   await update(userRef, updates);
 
   // Check for badges
   const currentBadges = userData.badges || [];
-  
+
   if (action === 'recycle' && newCount >= 10) {
     await checkAndAwardBadge(userId, 'ECO_WARRIOR', currentBadges);
   }
-  
+
   if (action === 'donate' && newCount >= 5) {
     await checkAndAwardBadge(userId, 'GENEROUS_SOUL', currentBadges);
   }
-  
+
   if (action === 'project' && newCount >= 3) {
-      // Assuming we might have a project badge later
-      // await checkAndAwardBadge(userId, 'PROJECT_MASTER', currentBadges);
+    // Assuming we might have a project badge later
+    // await checkAndAwardBadge(userId, 'PROJECT_MASTER', currentBadges);
   }
 
   // Also check level badge if level changed (only relevant if we updated XP/level above, or generally check)
@@ -159,7 +166,7 @@ export const incrementAction = async (userId: string, action: 'recycle' | 'donat
   // But wait, if we didn't update level, we can't check it easily without re-fetching or using logic.
   // Safe to just check if we have a new level from above logic.
   if (updates.level && updates.level >= 5) {
-      await checkAndAwardBadge(userId, 'SIERRA_MADRE', currentBadges);
+    await checkAndAwardBadge(userId, 'SIERRA_MADRE', currentBadges);
   }
 };
 
@@ -171,4 +178,41 @@ const checkAndAwardBadge = async (userId: string, badgeId: string, currentBadges
     });
     // Ideally trigger a notification here
   }
+};
+
+export const redeemReward = async (userId: string, cost: number, rewardId: string) => {
+  const userRef = ref(db, `users/${userId}`);
+  const snapshot = await get(userRef);
+
+  if (!snapshot.exists()) return { success: false, message: 'User not found' };
+
+  const userData = snapshot.val();
+  const currentEcoPoints = userData.ecoPoints || 0;
+  const unlockedBorders = userData.unlockedBorders || [];
+
+  if (unlockedBorders.includes(rewardId)) {
+    return { success: false, message: 'Reward already unlocked', alreadyUnlocked: true };
+  }
+
+  if (currentEcoPoints < cost) {
+    return { success: false, message: 'Insufficient Eco Points' };
+  }
+
+  const newEcoPoints = currentEcoPoints - cost;
+  const newUnlockedBorders = [...unlockedBorders, rewardId];
+
+  await update(userRef, {
+    ecoPoints: newEcoPoints,
+    unlockedBorders: newUnlockedBorders
+  });
+
+  return { success: true, message: 'Reward redeemed successfully!', newBalance: newEcoPoints };
+};
+
+export const equipBorder = async (userId: string, borderId: string) => {
+  const userRef = ref(db, `users/${userId}`);
+  await update(userRef, {
+    equippedBorder: borderId
+  });
+  return { success: true };
 };

@@ -15,3 +15,37 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Avatar Borders */
+.border_nodefault {
+  border: 3px solid transparent !important;
+}
+
+.border_leaf_static {
+  border: 4px solid #82AA52 !important;
+  box-shadow: 0 0 0 2px #fff inset !important;
+}
+
+.border_water_static {
+  border: 4px solid #4FC3F7 !important;
+  box-shadow: 0 0 0 2px #fff inset !important;
+}
+
+.border_fire_static {
+  border: 4px solid #FF7043 !important;
+  box-shadow: 0 0 0 2px #fff inset !important;
+}
+
+.border_gold_anim {
+  border: 4px solid transparent !important;
+  background: linear-gradient(white, white) padding-box,
+    linear-gradient(45deg, #FFD700, #FFA500, #FFD700) border-box !important;
+  animation: borderSpin 2s linear infinite !important;
+  box-shadow: 0 0 0 2px #fff inset !important;
+}
+
+@keyframes borderSpin {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}

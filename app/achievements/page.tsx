@@ -9,7 +9,7 @@ import styles from './achievements.module.css';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebase';
 import { ref, onValue, update, get, push } from 'firebase/database';
-import { awardXP, getNextLevelXp, incrementAction } from '../../lib/gamification';
+import { awardXP, getNextLevelXp, incrementAction, redeemReward, equipBorder } from '../../lib/gamification';
 import { createNotification } from '../../lib/notifications';
 
 interface Task {
@@ -33,11 +33,14 @@ export default function Achievements() {
 
     const [stats, setStats] = useState({
         xp: 0,
+        ecoPoints: 0,
         level: 1,
         badges: [] as string[],
         recyclingCount: 0,
         donationCount: 0,
         projectsCompleted: 0,
+        unlockedBorders: [] as string[],
+        equippedBorder: ''
     });
 
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -68,13 +71,23 @@ export default function Achievements() {
             if (data) {
                 setStats({
                     xp: data.xp || 0,
+                    ecoPoints: data.ecoPoints || 0,
                     level: data.level || 1,
                     badges: data.badges || [],
                     recyclingCount: data.recyclingCount || 0,
                     donationCount: data.donationCount || 0,
                     projectsCompleted: data.projectsCompleted || 0,
+                    unlockedBorders: data.unlockedBorders || [],
+                    equippedBorder: data.equippedBorder || ''
                 });
                 setCompletedTasks(data.completedTasks || []);
+
+                // Migration: Sync ecoPoints with XP if ecoPoints is missing OR (0 and no rewards unlocked)
+                // This handles cases where ecoPoints might have been initialized to 0 incorrectly
+                const hasRedeemed = Array.isArray(data.unlockedBorders) && data.unlockedBorders.length > 0;
+                if (data.xp > 0 && (data.ecoPoints === undefined || (data.ecoPoints === 0 && !hasRedeemed))) {
+                    update(userRef, { ecoPoints: data.xp });
+                }
             }
         });
 
@@ -98,6 +111,59 @@ export default function Achievements() {
 
     const toggleCategory = (category: string) => {
         setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }));
+    };
+
+    const handleFeedbackSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const newError = { rating: false, text: false };
+        let isValid = true;
+
+        if (feedbackRating === 0) {
+            newError.rating = true;
+            isValid = false;
+        }
+
+        if (feedbackText.trim() === '') {
+            newError.text = true;
+            isValid = false;
+        }
+
+        setFeedbackError(newError);
+
+        if (!isValid) return;
+        if (!user) return;
+
+        setIsFeedbackSubmitting(true);
+
+        try {
+            const feedbackRef = ref(db, 'feedbacks');
+            await push(feedbackRef, {
+                userId: user.uid,
+                userName: user.displayName || 'Anonymous',
+                userAvatar: user.photoURL || '',
+                rating: feedbackRating,
+                text: feedbackText,
+                source: 'achievements',
+                createdAt: Date.now(),
+                status: 'new'
+            });
+
+            setIsFeedbackSubmitting(false);
+            setShowThankYou(true);
+
+            setTimeout(() => {
+                setIsFeedbackModalOpen(false);
+                setShowThankYou(false);
+                setFeedbackRating(0);
+                setFeedbackText('');
+            }, 3000);
+
+        } catch (error) {
+            console.error("Error submitting feedback:", error);
+            setIsFeedbackSubmitting(false);
+            alert("Failed to submit feedback. Please try again.");
+        }
     };
 
     // Main tasks for Sierra Madre (donate, recycle, project, AND points/xp)
@@ -130,7 +196,7 @@ export default function Achievements() {
                 if (!newBadges.includes('sierra_madre')) {
                     newBadges.push('sierra_madre');
                     await update(userRef, { badges: newBadges });
-                    await createNotification(user.uid, 
+                    await createNotification(user.uid,
                         '🎉 Legendary Achievement Unlocked!',
                         '👑 Sierra Madre - You completed all main tasks! The legendary badge is yours.',
                         'success',
@@ -271,6 +337,61 @@ export default function Achievements() {
         );
     };
 
+
+    const [showRewardsModal, setShowRewardsModal] = useState(false);
+    const [rewardActionLoading, setRewardActionLoading] = useState<string | null>(null);
+
+    // Mock Rewards Data
+    const BORDERS = [
+        { id: 'border_leaf_static', name: 'Nature Guide', cost: 500, type: 'static', preview: '🌿', description: 'A fresh green border for nature lovers.' },
+        { id: 'border_water_static', name: 'Ocean Saver', cost: 800, type: 'static', preview: '💧', description: 'Blue as the ocean you save.' },
+        { id: 'border_fire_static', name: 'Passion Flame', cost: 1200, type: 'static', preview: '🔥', description: 'For those with a burning passion for change.' },
+        { id: 'border_gold_anim', name: 'Golden Eco-Warrior', cost: 2000, type: 'animated', preview: '✨', description: 'Legendary animated border for the elite.' },
+    ];
+
+    const handleRedeem = async (reward: typeof BORDERS[0]) => {
+        if (!user || rewardActionLoading) return;
+        setRewardActionLoading(reward.id);
+
+        try {
+            const result = await redeemReward(user.uid, reward.cost, reward.id);
+            if (result.success) {
+                setStats(prev => ({
+                    ...prev,
+                    ecoPoints: result.newBalance !== undefined ? result.newBalance : prev.ecoPoints,
+                    unlockedBorders: [...(stats.badges || []), reward.id] // Optimistic update (though real sync comes from listener)
+                }));
+                setSuccessModal({ isOpen: true, title: 'Reward Redeemed!', message: `You have unlocked the ${reward.name} border!` });
+            } else {
+                setSuccessModal({ isOpen: true, title: 'Redemption Failed', message: result.message || 'Unknown error' });
+            }
+        } catch (error) {
+            console.error(error);
+            setSuccessModal({ isOpen: true, title: 'Error', message: 'Something went wrong.' });
+        } finally {
+            setRewardActionLoading(null);
+        }
+    };
+
+    const handleEquip = async (borderId: string) => {
+        if (!user || rewardActionLoading) return;
+        setRewardActionLoading(borderId);
+
+        try {
+            const result = await equipBorder(user.uid, borderId);
+            if (result.success) {
+                // The onValue listener in useEffect should pick this up, but we can optimistically update if needed
+                setSuccessModal({ isOpen: true, title: 'Equipped!', message: 'Your new border is active.' });
+            } else {
+                setSuccessModal({ isOpen: true, title: 'Error', message: 'Failed to equip.' });
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setRewardActionLoading(null);
+        }
+    };
+
     return (
         <ProtectedRoute>
             <div className={styles.pageWrapper}>
@@ -307,7 +428,7 @@ export default function Achievements() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className={styles.progressText}>{stats.xp}/{nextLevelXp} XP</div>
+                                <div className={styles.progressText}>{stats.xp}/{nextLevelXp} Eco Points</div>
                                 <div className={styles.currentLevel}>Progress to Level {stats.level + 1}</div>
                             </div>
                             {/* Stats Grid */}
@@ -330,13 +451,23 @@ export default function Achievements() {
                                 </div>
                                 <div className={styles.statItem}>
                                     <div className={styles.statNumber}>{stats.xp}</div>
-                                    <div className={styles.statLabel}>Total XP</div>
+                                    <div className={styles.statLabel}>Lifetime Eco Points</div>
+                                </div>
+                                <div className={styles.statItem}>
+                                    <div className={styles.statNumber}>{stats.ecoPoints}</div>
+                                    <div className={styles.statLabel}>Redeemable Points</div>
                                 </div>
                             </div>
                             {/* Tasks Section */}
                             <div className={styles.tasksSection}>
                                 <div className={styles.tasksHeader}>
                                     <h3>My Tasks</h3>
+                                    <button
+                                        className={styles.redeemBtn}
+                                        onClick={() => setShowRewardsModal(true)}
+                                    >
+                                        Redeem Rewards
+                                    </button>
                                 </div>
                                 <p className={styles.tasksSubtitle}>Complete tasks by category to earn more badges and points!</p>
                                 <div className={styles.taskCategories}>
@@ -412,6 +543,62 @@ export default function Achievements() {
                         </div>
                         {/* Feedback Button */}
                         <div className={styles.feedbackBtn} onClick={() => setIsFeedbackModalOpen(true)}>💬</div>
+
+                        {/* Rewards Modal */}
+                        {showRewardsModal && (
+                            <div className={styles.rewardsModal}>
+                                <div className={styles.rewardsContent}>
+                                    <div className={styles.rewardsHeader}>
+                                        <h3>Redeem Rewards</h3>
+                                        <button className={styles.closeBtn} onClick={() => setShowRewardsModal(false)}>×</button>
+                                    </div>
+                                    <div style={{ marginBottom: '20px', padding: '10px', background: '#e8f5e9', borderRadius: '8px', color: '#2e8b57', fontWeight: 'bold' }}>
+                                        Current Redeemable Points: {stats.ecoPoints}
+                                    </div>
+                                    <div className={styles.rewardsGrid}>
+                                        {BORDERS.map(border => {
+                                            const isUnlocked = (stats.unlockedBorders || []).includes(border.id);
+                                            const isEquipped = stats.equippedBorder === border.id;
+                                            const canAfford = stats.ecoPoints >= border.cost;
+
+                                            return (
+                                                <div key={border.id} className={styles.rewardItem}>
+                                                    <div className={`${styles.borderPreview} ${styles[border.id]}`}>
+                                                        {border.preview}
+                                                    </div>
+                                                    <div className={styles.rewardInfo}>
+                                                        <h4>{border.name}</h4>
+                                                        <p className={styles.rewardCost}>{border.cost} Eco Points</p>
+                                                    </div>
+                                                    {isUnlocked ? (
+                                                        isEquipped ? (
+                                                            <button className={`${styles.actionBtn} ${styles.equippedBtn}`} disabled>Equipped</button>
+                                                        ) : (
+                                                            <button
+                                                                className={`${styles.actionBtn} ${styles.equipActionBtn}`}
+                                                                onClick={() => handleEquip(border.id)}
+                                                                disabled={!!rewardActionLoading}
+                                                            >
+                                                                {rewardActionLoading === border.id ? 'Equipping...' : 'Equip'}
+                                                            </button>
+                                                        )
+                                                    ) : (
+                                                        <button
+                                                            className={`${styles.actionBtn} ${styles.redeemActionBtn}`}
+                                                            onClick={() => handleRedeem(border)}
+                                                            disabled={!canAfford || !!rewardActionLoading}
+                                                        >
+                                                            {rewardActionLoading === border.id ? 'Redeeming...' : 'Redeem'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Feedback Modal */}
                         {isFeedbackModalOpen && (
                             <div className={styles.feedbackModal} style={{ display: 'flex' }}>
@@ -445,10 +632,18 @@ export default function Achievements() {
                         )}
                         {/* Success Modal */}
                         {successModal.isOpen && (
-                            <div className={styles.successModal}>
-                                <h3>{successModal.title}</h3>
-                                <p>{successModal.message}</p>
-                                <button onClick={() => setSuccessModal({ ...successModal, isOpen: false })}>Close</button>
+                            <div className={styles.successModalOverlay}>
+                                <div className={styles.successModalContent}>
+                                    <div className={styles.successIcon}>🎉</div>
+                                    <h3>{successModal.title}</h3>
+                                    <p>{successModal.message}</p>
+                                    <button
+                                        className={styles.successCloseBtn}
+                                        onClick={() => setSuccessModal({ ...successModal, isOpen: false })}
+                                    >
+                                        Awesome!
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </main>

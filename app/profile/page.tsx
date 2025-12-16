@@ -49,7 +49,8 @@ export default function ProfilePage() {
     recyclingCount: 0,
     donationCount: 0,
     projectsCompleted: 0,
-    equippedBadge: '' as string
+    equippedBadge: '' as string,
+    equippedBorder: '' as string
   });
 
   useEffect(() => {
@@ -76,7 +77,8 @@ export default function ProfilePage() {
             recyclingCount: data.recyclingCount || 0,
             donationCount: data.donationCount || 0,
             projectsCompleted: data.projectsCompleted || 0,
-            equippedBadge: data.equippedBadge || ''
+            equippedBadge: data.equippedBadge || '',
+            equippedBorder: data.equippedBorder || ''
           });
         } else {
           // Initialize from Auth if no DB data
@@ -274,8 +276,12 @@ export default function ProfilePage() {
           </div>
 
           <div className={styles.profileHeader}>
-            <div className={styles.profileAvatar}>
-              {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'D'}
+            <div className={`${styles.profileAvatar} ${stats.equippedBorder ? stats.equippedBorder : ''}`}>
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'D'
+              )}
             </div>
             <div className={styles.profileInfo}>
               <h2>{user?.displayName || 'Guest User'}</h2>

@@ -18,6 +18,7 @@ export default function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [equippedBadge, setEquippedBadge] = useState<string>('');
+  const [equippedBorder, setEquippedBorder] = useState<string>('');
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -56,10 +57,22 @@ export default function Header() {
     const userRef = ref(db, `users/${user.uid}`);
     const unsubscribe = onValue(userRef, (snapshot) => {
       const data = snapshot.val();
-      if (data && data.equippedBadge) {
-        setEquippedBadge(data.equippedBadge);
+      if (data) {
+        if (data.equippedBadge) {
+          setEquippedBadge(data.equippedBadge);
+        } else {
+          setEquippedBadge('');
+        }
+
+        // Also fetch equipped border
+        if (data.equippedBorder) {
+          setEquippedBorder(data.equippedBorder);
+        } else {
+          setEquippedBorder('');
+        }
       } else {
         setEquippedBadge('');
+        setEquippedBorder('');
       }
     });
 
@@ -230,11 +243,13 @@ export default function Header() {
           )}
         </div>
         <div className={styles.userProfile} ref={profileRef} onClick={() => setShowProfileDropdown(!showProfileDropdown)}>
-          <div className={styles.profilePic}>
+          <div className={`${styles.profilePic} ${equippedBorder ? equippedBorder : ''}`}>
             {user.photoURL ? (
               <img src={user.photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
-              user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3d6a06', color: 'white', fontWeight: 'bold' }}>
+                {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+              </div>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

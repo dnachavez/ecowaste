@@ -246,19 +246,14 @@ export default function RequestsManagement() {
                     </select>
                   </div>
                   <div className={styles.formGroup}>
-                    <label>Delivery Status</label>
-                    <select
-                      value={currentRequest.deliveryStatus || ''}
-                      onChange={e => setCurrentRequest({ ...currentRequest, deliveryStatus: e.target.value })}
-                    >
-                      <option value="">Select Status</option>
-                      <option value="Pending Item">Pending Item</option>
-                      <option value="Ready for Pickup">Ready for Pickup</option>
-                      <option value="At Sorting Facility">At Sorting Facility</option>
-                      <option value="In Transit">In Transit</option>
-                      <option value="Delivered">Delivered</option>
-                      <option value="Cancelled">Cancelled</option>
-                    </select>
+                    <label>Delivery Status (Managed by Donor)</label>
+                    <input
+                      type="text"
+                      value={currentRequest.deliveryStatus || 'Pending'}
+                      disabled
+                      className={styles.readOnlyInput}
+                      style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                    />
                   </div>
                   <div className={styles.formGroup}>
                     <label>Pickup Date</label>
@@ -269,11 +264,12 @@ export default function RequestsManagement() {
                     />
                   </div>
                   <div className={styles.formGroup}>
-                    <label>Delivery Date</label>
+                    <label>Delivery Date (Set by Donor)</label>
                     <input
                       type="date"
                       value={currentRequest.deliveryDate || ''}
-                      onChange={e => setCurrentRequest({ ...currentRequest, deliveryDate: e.target.value })}
+                      disabled
+                      className={styles.readOnlyInput}
                     />
                   </div>
                   <div className={styles.modalActions}>
