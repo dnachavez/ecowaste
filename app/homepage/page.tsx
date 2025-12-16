@@ -309,6 +309,21 @@ function HomepageContent() {
 
   const handleRequestInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+
+    if (name === 'quantityClaim') {
+      const val = parseInt(value);
+      let maxQuantity = 1000;
+      if (selectedDonation && selectedDonation.quantity) {
+        maxQuantity = parseInt(selectedDonation.quantity) || 1000;
+      }
+
+      if (val > maxQuantity) {
+        // Option 1: Clamp it immediately
+        setRequestFormData(prev => ({ ...prev, [name]: maxQuantity }));
+        return;
+      }
+    }
+
     setRequestFormData(prev => ({
       ...prev,
       [name]: value
@@ -317,10 +332,11 @@ function HomepageContent() {
 
   const adjustQuantity = (amount: number) => {
     setRequestFormData(prev => {
-      const newQuantity = Math.max(1, prev.quantityClaim + amount);
-      // If we had a max quantity check, we'd add it here. 
-      // Assuming donation.quantity is a string like "7", we should parse it.
-      // But for now just preventing < 1.
+      let maxQuantity = 1000;
+      if (selectedDonation && selectedDonation.quantity) {
+        maxQuantity = parseInt(selectedDonation.quantity) || 1000;
+      }
+      const newQuantity = Math.min(maxQuantity, Math.max(1, prev.quantityClaim + amount));
       return { ...prev, quantityClaim: newQuantity };
     });
   };
@@ -422,22 +438,6 @@ function HomepageContent() {
 
       const donationsRef = ref(db, 'donations');
       await push(donationsRef, donationData);
-
-      // Award XP for donating (action initialized)
-      // Note: We also award XP when donation is DELIVERED in app/donations/page.tsx.
-      // We should probably only award for ONE of these events to avoid double counting, 
-      // OR award a small amount here for listing and a larger amount for completing.
-      // Let's award a small amount (e.g. 5 XP) for listing to encourage activity.
-      // But for now, to keep it simple and consistent with the requirement "Donated 5+ items",
-      // we should probably count "Donated" as "Listed and Delivered" or just "Listed"?
-      // Usually "Donated" means you gave it away.
-      // In app/donations/page.tsx I added incrementAction when status becomes 'completed'.
-      // So I won't add it here to avoid double counting for the "Donated 5+ items" badge.
-      // HOWEVER, the user might want immediate feedback.
-      // Let's assume 'Donated' badge counts COMPLETED donations.
-      // But we can give some XP for *posting* a donation request?
-      // Let's leave it for now to avoid confusion. The prompt said "donating 5 or more items".
-      // I'll assume that means successfully donating.
 
       setShowDonationPopup(false);
       setShowSuccessPopup(true);
@@ -547,9 +547,6 @@ function HomepageContent() {
 
           // Count completed projects for stats
           const completedCount = myProjects.filter(p => p.status === 'completed').length;
-          // If status is not strictly 'completed', we might want to count all 'active' ones too?
-          // The previous mock was '0'. Let's stick to 'completed' as it implies 'Recycled'. 
-          // If the user just started a project, it's not recycled yet.
           setQuickStats(prev => ({ ...prev, recycled: completedCount }));
         }
 
@@ -1024,6 +1021,7 @@ function HomepageContent() {
                     value={requestFormData.quantityClaim}
                     onChange={handleRequestInputChange}
                     min="1"
+                    className={styles.noSpinner}
                     style={{ width: '60px', textAlign: 'center', border: '1.5px solid #ccc', borderRadius: '6px', padding: '6px' }}
                   />
                   <button type="button" onClick={() => adjustQuantity(1)} style={{ width: '32px', height: '32px', border: 'none', background: '#f0f0f0', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
