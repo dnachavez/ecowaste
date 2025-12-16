@@ -16,7 +16,15 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'success', onClose }) => 
   return (
     <div className={styles.toastContainer} aria-live="polite">
       <div className={`${styles.toast} ${type === 'success' ? styles.success : styles.error}`}>
-        <div className={styles.message}>{message}</div>
+        <div className={styles.content}>
+          <div className={styles.icon}>
+            {type === 'success' ? <i className="fas fa-check-circle" /> : <i className="fas fa-exclamation-circle" />}
+          </div>
+          <div className={styles.textContainer}>
+            <div className={styles.title}>{type === 'success' ? 'Success' : 'Error'}</div>
+            <div className={styles.message}>{message}</div>
+          </div>
+        </div>
         <button className={styles.closeBtn} onClick={onClose} aria-label="Close notification">×</button>
       </div>
     </div>

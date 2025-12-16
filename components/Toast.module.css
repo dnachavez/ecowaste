@@ -1,42 +1,113 @@
 .toastContainer {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  top: 30px;
+  /* Top center */
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  pointer-events: none;
+  /* Allow clicking through container */
 }
 
 .toast {
-  min-width: 220px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  color: #fff;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
-  font-weight: 600;
+  min-width: 320px;
+  max-width: 450px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #333;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.05);
+  /* Premium double shadow */
+  font-weight: 500;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  pointer-events: auto;
+  border-left: 5px solid transparent;
+  animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Apple-like spring */
+  backdrop-filter: blur(10px);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .success {
-  background: linear-gradient(90deg, #2ecc71, #27ae60);
+  border-left-color: #2ecc71;
+  background: #f0fdf4;
+  /* Very light green tint */
 }
 
 .error {
-  background: linear-gradient(90deg, #e74c3c, #c0392b);
+  border-left-color: #e74c3c;
+  background: #fef2f2;
+  /* Very light red tint */
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.icon {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Icon colors */
+.success .icon {
+  color: #2ecc71;
+}
+
+.error .icon {
+  color: #e74c3c;
+}
+
+.textContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 2px;
 }
 
 .message {
-  margin-right: 8px;
   font-size: 14px;
+  color: #555;
+  line-height: 1.4;
 }
 
 .closeBtn {
   background: transparent;
   border: none;
-  color: rgba(255,255,255,0.9);
-  font-weight: 700;
+  color: #999;
+  font-size: 20px;
+  line-height: 1;
   cursor: pointer;
+  padding: 0;
+  margin-left: 12px;
+  transition: color 0.2s;
+}
+
+.closeBtn:hover {
+  color: #333;
 }

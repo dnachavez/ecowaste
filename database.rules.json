@@ -3,7 +3,9 @@
     "users": {
       ".read": "auth != null",
       ".indexOn": [
-        "role"
+        "role",
+        "fullName",
+        "contactNumber"
       ],
       "$uid": {
         ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
