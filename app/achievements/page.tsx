@@ -166,8 +166,8 @@ export default function Achievements() {
         }
     };
 
-    // Main tasks for Sierra Madre (donate, recycle, project, AND points/xp)
-    const mainTasks = tasks.filter(t => t.type === 'donate' || t.type === 'recycle' || t.type === 'project' || t.type === 'xp');
+    // Sierra Madre requires ALL tasks to be completed
+    const mainTasks = tasks;
     const completedMainTasksCount = mainTasks.filter(t => completedTasks.includes(t.id)).length;
     const totalMainTasksCount = mainTasks.length;
 

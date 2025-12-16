@@ -10,6 +10,7 @@ import styles from './profile.module.css';
 import { db } from '../../lib/firebase';
 import { ref, onValue, update } from 'firebase/database';
 import { updateProfile } from 'firebase/auth';
+import { AVATAR_REWARDS } from '../../lib/gamification';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -50,7 +51,8 @@ export default function ProfilePage() {
     donationCount: 0,
     projectsCompleted: 0,
     equippedBadge: '' as string,
-    equippedBorder: '' as string
+    equippedBorder: '' as string,
+    equippedAvatar: '' as string
   });
 
   useEffect(() => {
@@ -78,7 +80,8 @@ export default function ProfilePage() {
             donationCount: data.donationCount || 0,
             projectsCompleted: data.projectsCompleted || 0,
             equippedBadge: data.equippedBadge || '',
-            equippedBorder: data.equippedBorder || ''
+            equippedBorder: data.equippedBorder || '',
+            equippedAvatar: data.equippedAvatar || ''
           });
         } else {
           // Initialize from Auth if no DB data
@@ -247,6 +250,25 @@ export default function ProfilePage() {
 
   const hasBadge = (id: string) => stats.badges.includes(id) || stats.badges.includes(id.toUpperCase());
 
+  // Helper to render equipped avatar
+  const renderProfileAvatar = () => {
+    if (stats.equippedAvatar && stats.equippedAvatar !== 'default') {
+      const reward = AVATAR_REWARDS.find(r => r.id === stats.equippedAvatar);
+      if (reward) {
+        return (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e8f5e9', fontSize: '60px', borderRadius: '50%' }}>
+            {reward.preview}
+          </div>
+        );
+      }
+    }
+    // Default fallback
+    if (user?.photoURL) {
+      return <img src={user.photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />;
+    }
+    return user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'D';
+  };
+
   const handleEquipBadge = async (badgeId: string) => {
     if (user) {
       try {
@@ -277,11 +299,7 @@ export default function ProfilePage() {
 
           <div className={styles.profileHeader}>
             <div className={`${styles.profileAvatar} ${stats.equippedBorder ? stats.equippedBorder : ''}`}>
-              {user?.photoURL ? (
-                <img src={user.photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-              ) : (
-                user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'D'
-              )}
+              {renderProfileAvatar()}
             </div>
             <div className={styles.profileInfo}>
               <h2>{user?.displayName || 'Guest User'}</h2>

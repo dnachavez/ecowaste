@@ -78,7 +78,8 @@ export default function DonationsPage() {
     // Edit Modal State
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedRequestForEdit, setSelectedRequestForEdit] = useState<Request | null>(null);
-    const [editQuantity, setEditQuantity] = useState<number>(1);
+    const [editQuantity, setEditQuantity] = useState<number>(0);
+    const [editMaxAvailable, setEditMaxAvailable] = useState<number>(0); // New state for clamping
     const [editUrgency, setEditUrgency] = useState<string>('Low');
 
     // Approval Modal State
@@ -439,10 +440,28 @@ export default function DonationsPage() {
         }
     };
 
-    const handleEditRequest = (request: Request) => {
+    const handleEditRequest = async (request: Request) => {
         setSelectedRequestForEdit(request);
         setEditQuantity(request.quantity);
         setEditUrgency(request.urgencyLevel || 'Low');
+
+        // Fetch max available immediately for clamping
+        try {
+            const donationRef = ref(db, `donations/${request.donationId}`);
+            const donationSnap = await get(donationRef);
+            if (donationSnap.exists()) {
+                const donation = donationSnap.val();
+                const currentStock = Number(donation.quantity) || 0;
+                // For pending requests, stock is not yet deducted, so max available is just current stock
+                setEditMaxAvailable(currentStock);
+            } else {
+                setEditMaxAvailable(Number(request.quantity) || 0); // Fallback
+            }
+        } catch (err) {
+            console.error('Failed to fetch max quantity for edit:', err);
+            setEditMaxAvailable(Number(request.quantity) || 0); // Fallback
+        }
+
         setShowEditModal(true);
     };
 
@@ -450,6 +469,24 @@ export default function DonationsPage() {
         if (!selectedRequestForEdit) return;
 
         try {
+            // Fetch the donation to check available quantity
+            const donationRef = ref(db, `donations/${selectedRequestForEdit.donationId}`);
+            const donationSnap = await get(donationRef);
+
+            if (donationSnap.exists()) {
+                const donation = donationSnap.val();
+                const currentStock = Number(donation.quantity) || 0;
+                const originalRequestQty = Number(selectedRequestForEdit.quantity) || 0;
+                // The max a user can request is the current remaining stock + what they currently hold
+                const maxAvailable = currentStock + originalRequestQty;
+
+                if (editQuantity > maxAvailable) {
+                    alert(`Cannot exceed available quantity. Maximum available: ${maxAvailable}`);
+                    setEditQuantity(maxAvailable);
+                    return;
+                }
+            }
+
             const requestRef = ref(db, `requests/${selectedRequestForEdit.id}`);
             await update(requestRef, {
                 quantity: editQuantity,
@@ -462,7 +499,6 @@ export default function DonationsPage() {
             alert("Failed to update request.");
         }
     };
-
     const handleCancelRequest = async (request: Request) => {
         // Check if status is "Ready for Pickup" or further
         const nonCancellableStatuses = ['Ready for Pickup', 'At Sorting Facility', 'In Transit', 'Delivered'];
@@ -1049,8 +1085,18 @@ export default function DonationsPage() {
                                         <input
                                             type="number"
                                             min="1"
-                                            value={editQuantity}
-                                            onChange={(e) => setEditQuantity(parseInt(e.target.value))}
+                                            max={editMaxAvailable}
+                                            value={editQuantity || ''} // Handle 0 or NaN as empty string
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value);
+                                                if (isNaN(val)) {
+                                                    setEditQuantity(0);
+                                                } else if (val > editMaxAvailable) {
+                                                    setEditQuantity(editMaxAvailable);
+                                                } else {
+                                                    setEditQuantity(val);
+                                                }
+                                            }}
                                             style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
                                         />
                                     </div>

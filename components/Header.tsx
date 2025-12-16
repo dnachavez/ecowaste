@@ -8,6 +8,7 @@ import { signOut } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { ref, query, orderByChild, onValue, limitToLast, equalTo } from 'firebase/database';
 import { Notification, markNotificationAsRead, markAllNotificationsAsRead } from '../lib/notifications';
+import { AVATAR_REWARDS, equipAvatar } from '../lib/gamification';
 import styles from './Header.module.css';
 
 export default function Header() {
@@ -17,8 +18,11 @@ export default function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false); // New state
   const [equippedBadge, setEquippedBadge] = useState<string>('');
   const [equippedBorder, setEquippedBorder] = useState<string>('');
+  const [equippedAvatar, setEquippedAvatar] = useState<string>(''); // New state
+  const [userLevel, setUserLevel] = useState<number>(1); // New state
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -64,15 +68,25 @@ export default function Header() {
           setEquippedBadge('');
         }
 
-        // Also fetch equipped border
         if (data.equippedBorder) {
           setEquippedBorder(data.equippedBorder);
         } else {
           setEquippedBorder('');
         }
+
+        if (data.equippedAvatar) {
+          setEquippedAvatar(data.equippedAvatar);
+        } else {
+          setEquippedAvatar('');
+        }
+
+        if (data.level) {
+          setUserLevel(data.level);
+        }
       } else {
         setEquippedBadge('');
         setEquippedBorder('');
+        setEquippedAvatar('');
       }
     });
 
@@ -176,6 +190,41 @@ export default function Header() {
     return date.toLocaleDateString();
   };
 
+  const handleEquipAvatar = async (avatarId: string) => {
+    if (!user) return;
+    try {
+      await equipAvatar(user.uid, avatarId);
+      // State updates automatically via listener
+      setShowAvatarModal(false);
+    } catch (error) {
+      console.error("Failed to equip avatar:", error);
+      alert("Failed to equip avatar.");
+    }
+  };
+
+  // Helper to get current avatar display
+  const renderAvatar = () => {
+    if (equippedAvatar && equippedAvatar !== 'default') {
+      const reward = AVATAR_REWARDS.find(r => r.id === equippedAvatar);
+      if (reward) {
+        return (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e8f5e9', fontSize: '24px' }}>
+            {reward.preview}
+          </div>
+        );
+      }
+    }
+    // Default fallback
+    if (user && user.photoURL) {
+      return <img src={user.photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
+    }
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3d6a06', color: 'white', fontWeight: 'bold' }}>
+        {user && user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+      </div>
+    );
+  };
+
   // If no user, we might want to show login button or nothing?
   // The pages protect the route, so usually user is present.
   // But just in case:
@@ -244,13 +293,7 @@ export default function Header() {
         </div>
         <div className={styles.userProfile} ref={profileRef} onClick={() => setShowProfileDropdown(!showProfileDropdown)}>
           <div className={`${styles.profilePic} ${equippedBorder ? equippedBorder : ''}`}>
-            {user.photoURL ? (
-              <img src={user.photoURL} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3d6a06', color: 'white', fontWeight: 'bold' }}>
-                {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
-              </div>
-            )}
+            {renderAvatar()}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {badgeIcon && (
@@ -264,6 +307,13 @@ export default function Header() {
           {showProfileDropdown && (
             <div className={styles.profileDropdown}>
               <Link href="/profile" className={styles.dropdownItem}><i className="fas fa-user" style={{ marginRight: '10px' }}></i> My Profile</Link>
+              <button
+                onClick={() => { setShowProfileDropdown(false); setShowAvatarModal(true); }}
+                className={styles.dropdownItem}
+                style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', textAlign: 'left' }}
+              >
+                <i className="fas fa-user-astronaut" style={{ marginRight: '10px' }}></i> Change Avatar
+              </button>
               <Link href="/settings" className={styles.dropdownItem}><i className="fas fa-cog" style={{ marginRight: '10px' }}></i> Settings</Link>
               <div className={styles.dropdownDivider}></div>
               <button onClick={handleLogout} className={styles.dropdownItem} style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}>
@@ -273,6 +323,120 @@ export default function Header() {
           )}
         </div>
       </div>
+      {showAvatarModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '25px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setShowAvatarModal(false)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                border: 'none',
+                background: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#666'
+              }}
+            >
+              ×
+            </button>
+
+            <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#2e8b57', textAlign: 'center' }}>Choose Your Avatar</h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '15px' }}>
+              {/* Default Avatar Option */}
+              <div
+                onClick={() => handleEquipAvatar('default')}
+                style={{
+                  border: equippedAvatar === 'default' || !equippedAvatar ? '3px solid #4caf50' : '1px solid #ddd',
+                  borderRadius: '10px',
+                  padding: '10px',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  backgroundColor: equippedAvatar === 'default' || !equippedAvatar ? '#446447ff' : 'white',
+                  transition: 'transform 0.2s',
+                }}
+              >
+                <div style={{ width: '60px', height: '60px', margin: '0 auto 10px', borderRadius: '50%', overflow: 'hidden' }}>
+                  {user && user.photoURL ? (
+                    <img src={user.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3d6a06', color: 'white', fontWeight: 'bold', fontSize: '24px' }}>
+                      {user && user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                  )}
+                </div>
+                <h4 style={{ margin: '5px 0 0', fontSize: '14px' }}>Default</h4>
+                {equippedAvatar === 'default' || !equippedAvatar ? <span style={{ fontSize: '12px', color: '#4caf50', fontWeight: 'bold' }}>Equipped</span> : null}
+              </div>
+
+              {/* Rewards */}
+              {AVATAR_REWARDS.map(reward => {
+                const isUnlocked = userLevel >= reward.level;
+                const isEquipped = equippedAvatar === reward.id;
+
+                return (
+                  <div
+                    key={reward.id}
+                    onClick={() => isUnlocked ? handleEquipAvatar(reward.id) : null}
+                    style={{
+                      border: isEquipped ? '3px solid #4caf50' : '1px solid #ddd',
+                      borderRadius: '10px',
+                      padding: '10px',
+                      cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                      textAlign: 'center',
+                      backgroundColor: isEquipped ? '#446447ff' : isUnlocked ? 'white' : '#f5f5f5',
+                      opacity: isUnlocked ? 1 : 0.6,
+                      position: 'relative'
+                    }}
+                  >
+                    <div style={{
+                      width: '60px',
+                      height: '60px',
+                      margin: '0 auto 10px',
+                      borderRadius: '50%',
+                      backgroundColor: isUnlocked ? '#e8f5e9' : '#e0e0e0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '30px'
+                    }}>
+                      {reward.preview}
+                    </div>
+                    <h4 style={{ margin: '5px 0 0', fontSize: '14px' }}>{reward.name}</h4>
+                    <div style={{ fontSize: '11px', color: '#445933ff' }}>Lvl {reward.level}</div>
+
+                    {isEquipped && <span style={{ fontSize: '12px', color: '#4caf50', fontWeight: 'bold' }}>Equipped</span>}
+                    {!isUnlocked && <span style={{ fontSize: '12px', color: '#666' }}><i className="fas fa-lock"></i> Locked</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

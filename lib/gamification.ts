@@ -232,3 +232,11 @@ export const equipBorder = async (userId: string, borderId: string) => {
   });
   return { success: true };
 };
+
+export const equipAvatar = async (userId: string, avatarId: string) => {
+  const userRef = ref(db, `users/${userId}`);
+  await update(userRef, {
+    equippedAvatar: avatarId
+  });
+  return { success: true };
+};
