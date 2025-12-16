@@ -119,7 +119,7 @@ export default function TasksManagement() {
       return;
     }
     try {
-      const { ref, push } = await import('firebase/database');
+      const { ref, push, set} = await import('firebase/database');
       const newBadgeRef = push(ref(db, 'badges'));
       await set(newBadgeRef, newBadge);
       alert('Badge created successfully!');
@@ -211,6 +211,7 @@ export default function TasksManagement() {
                 <form onSubmit={handleSaveTask}>
                   <div className={styles.formGroup}>
                     <label>Title</label>
+    
                     <input type="text" value={currentTask.title} onChange={(e) => setCurrentTask({ ...currentTask, title: e.target.value })} required />
                   </div>
                   <div className={styles.formGroup}>
@@ -219,6 +220,7 @@ export default function TasksManagement() {
                   </div>
                   <div className={styles.formGroup}>
                     <label>Type</label>
+                  <select>
                     <option value="recycle">Recycle</option>
                     <option value="donate">Donate</option>
                     <option value="xp">Points</option>
