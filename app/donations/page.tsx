@@ -257,11 +257,37 @@ export default function DonationsPage() {
                 console.error("Error updating status or sending notification:", error);
             }
         } else {
-            // ... existing else block logic for other statuses
+            // Updated logic for completion and other statuses
+            const updates: Record<string, unknown> = { status: newStatus };
+
+            if (newStatus === 'completed') {
+                updates.deliveryStatus = 'Delivered';
+                updates.deliveredDate = new Date().toISOString();
+
+                // Increment donation count for the DONOR (owner)
+                // Note: incrementAction handles XP/EcoPoints awarding too
+                try {
+                    console.log(`[DONATION_COMPLETE] Awarding points to donor: ${request.ownerId}`);
+                    await incrementAction(request.ownerId, 'donate', 1);
+                } catch (e) {
+                    console.error("Error incrementing donor stats:", e);
+                }
+            }
+
             const requestRef = ref(db, `requests/${request.id}`);
-            update(requestRef, { status: newStatus })
+            update(requestRef, updates)
                 .then(async () => {
-                    // ...
+                    // Notification Logic
+                    if (newStatus === 'completed') {
+                        // Notify Donor that their item was received
+                        await createNotification(
+                            request.ownerId,
+                            'Donation Received',
+                            `Good news! ${request.requesterName} has received your donation "${request.donationTitle}". You earned Eco Points!`,
+                            'success',
+                            request.id
+                        );
+                    }
                 })
                 .catch((error) => console.error("Error updating status:", error));
         }

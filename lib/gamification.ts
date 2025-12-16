@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { ref, get, update, child } from 'firebase/database';
+import { ref, get, update } from 'firebase/database';
 
 export interface Badge {
   id: string;
@@ -8,6 +8,22 @@ export interface Badge {
   icon: string; // Path to icon
   condition: string;
 }
+
+export interface AvatarReward {
+  level: number;
+  id: string;
+  name: string;
+  description: string;
+  type: 'basic' | 'improved' | 'animated' | 'special';
+  preview: string; // Emoji for now
+}
+
+export const AVATAR_REWARDS: AvatarReward[] = [
+  { level: 10, id: 'avatar_lvl10', name: 'Eco Novice', description: 'A basic avatar for reaching Level 10.', type: 'basic', preview: '🌱' },
+  { level: 20, id: 'avatar_lvl20', name: 'Green Guardian', description: 'Better design for Level 20 achievers.', type: 'improved', preview: '🌿' },
+  { level: 30, id: 'avatar_lvl30', name: 'Earth Defender', description: 'Animated avatar for Level 30.', type: 'animated', preview: '✨' },
+  { level: 50, id: 'avatar_lvl50', name: 'Gaia Champion', description: 'Ultimate animated avatar with effects.', type: 'special', preview: '🌟' }
+];
 
 export const BADGES: Record<string, Badge> = {
   SIERRA_MADRE: {

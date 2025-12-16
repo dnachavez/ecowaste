@@ -9,7 +9,7 @@ import styles from './achievements.module.css';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebase';
 import { ref, onValue, update, get, push } from 'firebase/database';
-import { awardXP, getNextLevelXp, incrementAction, redeemReward, equipBorder } from '../../lib/gamification';
+import { awardXP, getNextLevelXp, redeemReward, equipBorder, AVATAR_REWARDS } from '../../lib/gamification';
 import { createNotification } from '../../lib/notifications';
 
 interface Task {
@@ -260,7 +260,7 @@ export default function Achievements() {
         if (task.rewardType === 'badge' && task.badgeId && !newBadges.includes(task.badgeId)) {
             newBadges.push(task.badgeId);
         }
-        const updates: any = { completedTasks: [...completedTasks, task.id] };
+        const updates: Record<string, unknown> = { completedTasks: [...completedTasks, task.id] };
         if (task.rewardType === 'badge') updates.badges = newBadges;
         await update(ref(db, `users/${user.uid}`), updates);
         if (task.rewardType !== 'badge' && task.xpReward) {
@@ -339,6 +339,7 @@ export default function Achievements() {
 
 
     const [showRewardsModal, setShowRewardsModal] = useState(false);
+    const [showLevelModal, setShowLevelModal] = useState(false);
     const [rewardActionLoading, setRewardActionLoading] = useState<string | null>(null);
 
     // Mock Rewards Data
@@ -405,7 +406,7 @@ export default function Achievements() {
                         </div>
                         <div className={styles.achievementsContent}>
                             {/* Level Card */}
-                            <div className={styles.levelCard}>
+                            <div className={styles.levelCard} onClick={() => setShowLevelModal(true)} style={{ cursor: 'pointer', transition: 'transform 0.2s' }} title="Click to view Level Rewards">
                                 <div className={styles.circularProgress}>
                                     <svg className={styles.progressRing} width="200" height="200">
                                         <circle className={styles.progressRingCircle} stroke="#e0e0e0" strokeWidth="10" fill="transparent" r="90" cx="100" cy="100" />
@@ -643,6 +644,59 @@ export default function Achievements() {
                                     >
                                         Awesome!
                                     </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Level Rewards Modal */}
+                        {showLevelModal && (
+                            <div className={styles.rewardsModal}>
+                                <div className={styles.rewardsContent} style={{ maxWidth: '600px' }}>
+                                    <div className={styles.rewardsHeader}>
+                                        <h3>Level Progression Rewards</h3>
+                                        <button className={styles.closeBtn} onClick={() => setShowLevelModal(false)}>×</button>
+                                    </div>
+                                    <div style={{ padding: '20px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                            {AVATAR_REWARDS.map((reward) => {
+                                                const isUnlocked = stats.level >= reward.level;
+                                                return (
+                                                    <div key={reward.id} style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '15px',
+                                                        padding: '15px',
+                                                        background: isUnlocked ? '#e8f5e9' : '#f5f5f5',
+                                                        borderRadius: '10px',
+                                                        border: isUnlocked ? '1px solid #4caf50' : '1px solid #ddd',
+                                                        opacity: isUnlocked ? 1 : 0.7
+                                                    }}>
+                                                        <div style={{
+                                                            fontSize: '30px',
+                                                            width: '60px',
+                                                            height: '60px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            background: 'white',
+                                                            borderRadius: '50%',
+                                                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                                        }}>
+                                                            {reward.preview}
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                <h4 style={{ margin: 0, color: '#333' }}>Level {reward.level}: {reward.name}</h4>
+                                                                {!isUnlocked && <span style={{ fontSize: '12px', background: '#ccc', padding: '2px 8px', borderRadius: '10px', color: '#555' }}>Locked</span>}
+                                                                {isUnlocked && <span style={{ fontSize: '12px', background: '#4caf50', padding: '2px 8px', borderRadius: '10px', color: 'white' }}>Unlocked</span>}
+                                                            </div>
+                                                            <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#666' }}>{reward.description}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
