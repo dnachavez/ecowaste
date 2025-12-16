@@ -52,6 +52,7 @@ interface FirebaseProject {
   id: string;
   title: string;
   description: string;
+  authorId?: string;
   authorName: string;
   createdAt: string;
   final_images?: string[];
@@ -80,6 +81,10 @@ function BrowseContent() {
   const [showRequestPopup, setShowRequestPopup] = useState(false);
   const [requestQuantity, setRequestQuantity] = useState(1);
   const [urgencyLevel, setUrgencyLevel] = useState('High');
+  // New state for project selection
+  const [selectedProjectId, setSelectedProjectId] = useState(projectIdParam || '');
+  const [userProjects, setUserProjects] = useState<{ id: string, title: string }[]>([]);
+
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
@@ -187,6 +192,8 @@ function BrowseContent() {
       alert("Failed to submit feedback.");
     }
   };
+
+
 
   useEffect(() => {
     const donationsRef = ref(db, 'donations');
@@ -346,6 +353,8 @@ function BrowseContent() {
     // Otherwise clamp to 1 initially.
     setRequestQuantity(1);
     setUrgencyLevel('High');
+    // Initialize project: if URL has param, use it, otherwise default to empty
+    setSelectedProjectId(projectIdParam || '');
     setShowRequestPopup(true);
   };
 
@@ -381,7 +390,8 @@ function BrowseContent() {
       status: 'pending',
       quantity: requestQuantity,
       urgencyLevel: urgencyLevel,
-      projectId: projectIdParam || null,
+      projectId: selectedProjectId || null,
+      projectTitle: userProjects.find(p => p.id === selectedProjectId)?.title || '',
       materialId: materialIdParam || null,
       createdAt: Date.now()
     };
@@ -427,14 +437,17 @@ function BrowseContent() {
     const unsubscribe = onValue(projectsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const loadedProjects = Object.entries(data)
-          .map(([key, value]) => {
-            const project = value as FirebaseProject;
-            return {
-              ...project,
-              id: key
-            };
-          })
+        // Shared processing for both Recycled Ideas and User Projects
+        const allProjects = Object.entries(data).map(([key, value]) => {
+          const project = value as FirebaseProject;
+          return {
+            ...project,
+            id: key
+          };
+        });
+
+        // 1. Recycled Ideas (Public)
+        const loadedRecycledIdeas = allProjects
           .filter(project => project.visibility === 'public' && project.final_images && project.final_images.length > 0)
           .map(project => ({
             id: project.id,
@@ -443,20 +456,30 @@ function BrowseContent() {
             timeAgo: project.createdAt,
             image: project.final_images ? project.final_images[0] : '',
             description: project.description,
-            commentsCount: 0, // Placeholder
+            commentsCount: 0,
             materials: project.materials ? (Array.isArray(project.materials) ? project.materials : Object.values(project.materials)) as ProjectMaterial[] : [],
             workflow_stage: project.workflow_stage,
             steps: project.steps ? (Array.isArray(project.steps) ? project.steps : Object.values(project.steps)) as Step[] : []
           }));
 
-        setRecycledIdeas(loadedProjects);
+        setRecycledIdeas(loadedRecycledIdeas);
+
+        // 2. User Projects (For Request Dropdown)
+        if (user) {
+          setUserProjects(allProjects.filter((p: any) => p.authorId === user.uid).map(p => ({
+            id: p.id,
+            title: p.title
+          })));
+        }
+
       } else {
         setRecycledIdeas([]);
+        setUserProjects([]);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   return (
     <ProtectedRoute>
@@ -710,11 +733,51 @@ function BrowseContent() {
                     <input
                       type="number"
                       value={requestQuantity}
-                      onChange={(e) => setRequestQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className={styles.noSpinner}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        let maxQ = 1000;
+                        if (selectedDonation && selectedDonation.quantity) {
+                          maxQ = parseInt(selectedDonation.quantity) || 1000;
+                        }
+                        if (maxRequestQuantity !== null) {
+                          maxQ = Math.min(maxQ, maxRequestQuantity);
+                        }
+
+                        if (val > maxQ) {
+                          setRequestQuantity(maxQ);
+                        } else {
+                          setRequestQuantity(Math.max(1, val));
+                        }
+                      }}
                       style={{ width: '60px', textAlign: 'center', border: '1.5px solid #ccc', borderRadius: '6px', padding: '6px' }}
                     />
-                    <button type="button" onClick={() => setRequestQuantity(requestQuantity + 1)} style={{ width: '32px', height: '32px', border: 'none', background: '#f0f0f0', borderRadius: '6px', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}>+</button>
+                    <button type="button" onClick={() => {
+                      let maxQ = 1000;
+                      if (selectedDonation && selectedDonation.quantity) {
+                        maxQ = parseInt(selectedDonation.quantity) || 1000;
+                      }
+                      if (maxRequestQuantity !== null) {
+                        maxQ = Math.min(maxQ, maxRequestQuantity);
+                      }
+                      setRequestQuantity(Math.min(maxQ, requestQuantity + 1));
+                    }} style={{ width: '32px', height: '32px', border: 'none', background: '#f0f0f0', borderRadius: '6px', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}>+</button>
                   </div>
+                </div>
+                <div style={{ marginBottom: '15px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }} htmlFor="projectId">Recycling Project:</label>
+                  <select
+                    id="projectId"
+                    name="projectId"
+                    value={selectedProjectId}
+                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                    style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  >
+                    <option value="">Select a project</option>
+                    {userProjects.map(p => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                    ))}
+                  </select>
                 </div>
                 <div style={{ marginBottom: '15px' }}>
                   <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Urgency Level:</label>

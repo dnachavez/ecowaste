@@ -130,11 +130,11 @@ export default function Achievements() {
                 if (!newBadges.includes('sierra_madre')) {
                     newBadges.push('sierra_madre');
                     await update(userRef, { badges: newBadges });
-                    await createNotification(user.uid, {
-                        title: '🎉 Legendary Achievement Unlocked!',
-                        message: '👑 Sierra Madre - You completed all main tasks! The legendary badge is yours.',
-                        type: 'success',
-                    });
+                    await createNotification(user.uid, 
+                        '🎉 Legendary Achievement Unlocked!',
+                        '👑 Sierra Madre - You completed all main tasks! The legendary badge is yours.',
+                        'success',
+                    );
                     setSuccessModal({ isOpen: true, title: 'Legendary Badge Unlocked!', message: 'Congratulations! You have unlocked the Sierra Madre Badge.' });
                 }
             };

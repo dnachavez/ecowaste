@@ -90,7 +90,7 @@
   right: 0;
   background-color: white;
   border-radius: 5px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   width: 200px;
   z-index: 100;
   display: none;
@@ -117,7 +117,7 @@
 .sidebar {
   background: linear-gradient(180deg, var(--light-green) 0%, #e8f5e8 100%);
   padding: 30px 20px;
-  box-shadow: 5px 0 25px rgba(0,0,0,0.08);
+  box-shadow: 5px 0 25px rgba(0, 0, 0, 0.08);
   position: sticky;
   width: 250px;
   top: 90px;
@@ -177,7 +177,7 @@
   overflow-y: auto;
   background: #F6FFEB;
   padding: 20px;
-  box-shadow: inset 0 0 4px rgba(0,0,0,0.1);
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.1);
 }
 
 .welcomeCard {
@@ -249,7 +249,7 @@
   background-color: white;
   border-radius: 10px;
   padding: 20px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 }
 
 .donationPost {
@@ -258,7 +258,7 @@
   border-radius: 12px;
   margin-bottom: 20px;
   background-color: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .donationUserHeader {
@@ -632,23 +632,26 @@
   background-color: white;
   border-radius: 10px;
   padding: 20px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   margin-bottom: 20px;
 }
 
-.card h2, .card h3 {
+.card h2,
+.card h3 {
   color: #82AA52;
   margin-bottom: 10px;
   font-size: 18px;
 }
 
-.projectsScroll, .leaderboardScroll {
+.projectsScroll,
+.leaderboardScroll {
   max-height: 250px;
   overflow-y: auto;
   padding-right: 5px;
 }
 
-.projectItemLink, .leaderboardItemLink {
+.projectItemLink,
+.leaderboardItemLink {
   text-decoration: none;
   color: inherit;
   display: block;
@@ -665,7 +668,7 @@
 
 .projectItem:hover {
   transform: translateY(-2px);
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 }
 
 .projectDate {
@@ -748,7 +751,7 @@
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border: 1px solid #e8e8e8;
 }
 
@@ -811,179 +814,193 @@
 
 /* Feedback Button Styles */
 .feedbackBtn {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    width: 60px;
-    height: 60px;
-    background-color: #82AA52;
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    z-index: 100;
-    transition: all 0.3s ease;
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  background-color: #82AA52;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  transition: all 0.3s ease;
 }
 
 .feedbackBtn:hover {
-    transform: scale(1.1);
-    background-color: #6d8f45;
+  transform: scale(1.1);
+  background-color: #6d8f45;
 }
 
 /* Feedback Modal Styles */
 .feedbackModal {
-    display: flex;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-    z-index: 2000;
-    justify-content: center;
-    align-items: center;
+  display: flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
 }
 
 .feedbackContent {
-    background-color: white;
-    padding: 30px;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 500px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    position: relative;
-    z-index: 2001;
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 2001;
 }
 
 .feedbackCloseBtn {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    font-size: 24px;
-    cursor: pointer;
-    color: #777;
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  font-size: 24px;
+  cursor: pointer;
+  color: #777;
 }
 
 .feedbackCloseBtn:hover {
-    color: #333;
+  color: #333;
 }
 
 .feedbackForm h3 {
-    color: #82AA52;
-    margin-bottom: 20px;
-    font-family: 'Montserrat', sans-serif;
+  color: #82AA52;
+  margin-bottom: 20px;
+  font-family: 'Montserrat', sans-serif;
 }
 
 .feedbackForm textarea {
-    width: 100%;
-    padding: 15px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    resize: vertical;
-    min-height: 150px;
-    margin-bottom: 20px;
-    font-family: 'Open Sans', sans-serif;
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 150px;
+  margin-bottom: 20px;
+  font-family: 'Open Sans', sans-serif;
 }
 
 .feedbackSubmitBtn {
-    background-color: #82AA52;
-    color: white;
-    border: none;
-    padding: 12px 25px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: background-color 0.3s;
-    width: 100%;
+  background-color: #82AA52;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.3s;
+  width: 100%;
 }
 
 .feedbackSubmitBtn:hover {
-    background-color: #6d8f45;
+  background-color: #6d8f45;
 }
 
 /* Emoji rating */
 .emojiRating {
-    display: flex;
-    justify-content: space-between;
-    margin: 20px 0;
+  display: flex;
+  justify-content: space-between;
+  margin: 20px 0;
 }
 
 .emojiOption {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    transition: transform 0.2s;
-    padding: 5px;
-    border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+  padding: 5px;
+  border-radius: 50%;
 }
 
 .emojiOption:hover {
-    transform: scale(1.2);
-    background-color: #f0f7e8;
+  transform: scale(1.2);
+  background-color: #f0f7e8;
 }
 
 .emojiOption.selected {
-    transform: scale(1.3);
-    background-color: #e0f0d8;
+  transform: scale(1.3);
+  background-color: #e0f0d8;
 }
 
 .emoji {
-    font-size: 30px;
-    margin-bottom: 5px;
+  font-size: 30px;
+  margin-bottom: 5px;
 }
 
 .emojiLabel {
-    font-size: 12px;
-    color: #666;
+  font-size: 12px;
+  color: #666;
 }
 
 .feedbackDetail {
-    font-size: 14px;
-    color: #666;
-    margin-bottom: 10px;
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 10px;
 }
 
 /* Thank you message */
 .thankYouMessage {
-    text-align: center;
-    padding: 20px;
+  text-align: center;
+  padding: 20px;
 }
 
 .thankYouMessage h3 {
-    color: #82AA52;
-    margin-bottom: 15px;
+  color: #82AA52;
+  margin-bottom: 15px;
 }
 
 .thankYouEmoji {
-    font-size: 50px;
-    margin-bottom: 20px;
+  font-size: 50px;
+  margin-bottom: 20px;
 }
 
 /* Error message */
 .errorMessage {
-    color: #e74c3c;     
-    font-size: 13px;
-    margin-top: 5px;
-    display: none;
+  color: #e74c3c;
+  font-size: 13px;
+  margin-top: 5px;
+  display: none;
 }
 
 /* Loading spinner */
 .spinner {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid rgba(255,255,255,0.3);
-    border-radius: 50%;
-    border-top-color: white;
-    animation: spin 1s ease-in-out infinite;
-    margin-left: 10px;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+  margin-left: 10px;
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hide number input arrows */
+.noSpinner::-webkit-outer-spin-button,
+.noSpinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.noSpinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
