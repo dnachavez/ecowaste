@@ -10,7 +10,7 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './homepage.module.css';
 import { db } from '../../lib/firebase';
 import { ref, push, onValue } from 'firebase/database';
-import { incrementAction } from '../../lib/gamification';
+import { incrementAction, getUserDisplayAvatar } from '../../lib/gamification';
 
 import RecycledIdeaPopup, { RecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
 
@@ -183,7 +183,7 @@ function HomepageContent() {
       await push(feedbackRef, {
         userId: user.uid,
         userName: user.displayName || 'Anonymous',
-        userAvatar: user.photoURL || '',
+        userAvatar: await getUserDisplayAvatar(user.uid),
         rating,
         text: feedbackText,
         createdAt: Date.now(),
@@ -301,6 +301,12 @@ function HomepageContent() {
   };
 
   const handleRequestClick = (donation: Donation) => {
+    // Check if quantity is 0
+    if (parseInt(donation.quantity) <= 0) {
+      alert('This donation is no longer available. All items have been claimed.');
+      return;
+    }
+
     setSelectedDonation(donation);
     setShowRequestPopup(true);
     // Reset quantity to 1 when opening
@@ -737,9 +743,15 @@ function HomepageContent() {
 
                       <div className={styles.donationActions}>
                         {user && donation.user.id !== user.uid ? (
-                          <button type="button" className={styles.requestBtn} onClick={() => handleRequestClick(donation)}>
-                            Request Donation
-                          </button>
+                          parseInt(donation.quantity) <= 0 ? (
+                            <button type="button" className={styles.requestBtn} style={{ backgroundColor: 'rgb(204 204 204)', cursor: 'not-allowed' }} disabled>
+                              All Items Claimed
+                            </button>
+                          ) : (
+                            <button type="button" className={styles.requestBtn} onClick={() => handleRequestClick(donation)}>
+                              Request Donation
+                            </button>
+                          )
                         ) : (
                           <button type="button" className={styles.requestBtn} style={{ backgroundColor: '#ccc', cursor: 'default' }} disabled>
                             Your Donation

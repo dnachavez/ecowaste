@@ -310,7 +310,7 @@ export default function DonationsPage() {
             const donationTxResult = await runTransaction(donationRef, (currentDonation) => {
                 if (currentDonation) {
                     const currentQty = Number(currentDonation.quantity) || 0;
-                    const newQty = currentQty - qtyToSubtract;
+                    const newQty = Math.max(0, currentQty - qtyToSubtract); // Prevent negative quantities
                     currentDonation.quantity = newQty.toString();
                 }
                 return currentDonation;
@@ -322,7 +322,7 @@ export default function DonationsPage() {
                 const snap = await get(donationRef);
                 if (snap.exists()) {
                     const currentQty = Number(snap.val().quantity) || 0;
-                    const newQty = currentQty - qtyToSubtract;
+                    const newQty = Math.max(0, currentQty - qtyToSubtract); // Prevent negative quantities
                     await update(donationRef, { quantity: newQty.toString() });
                 } else {
                     console.warn('Donation not found for fallback:', request.donationId);

@@ -240,3 +240,33 @@ export const equipAvatar = async (userId: string, avatarId: string) => {
   });
   return { success: true };
 };
+
+/**
+ * Get the user's display avatar (equipped reward or photoURL)
+ * Returns the avatar preview emoji if equipped, otherwise photoURL
+ */
+export const getUserDisplayAvatar = async (userId: string): Promise<string> => {
+  try {
+    const userRef = ref(db, `users/${userId}`);
+    const snapshot = await get(userRef);
+
+    if (!snapshot.exists()) return '';
+
+    const userData = snapshot.val();
+    const equippedAvatar = userData.equippedAvatar;
+
+    // If user has equipped avatar (not default), return the reward preview
+    if (equippedAvatar && equippedAvatar !== 'default') {
+      const reward = AVATAR_REWARDS.find(r => r.id === equippedAvatar);
+      if (reward) {
+        return reward.preview; // Return emoji for now
+      }
+    }
+
+    // Fallback to photoURL
+    return userData.photoURL || '';
+  } catch (error) {
+    console.error('Error getting user display avatar:', error);
+    return '';
+  }
+};

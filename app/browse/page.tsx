@@ -348,6 +348,12 @@ function BrowseContent() {
   };
 
   const openRequestModal = (donation: Donation) => {
+    // Check if quantity is 0
+    if (parseInt(donation.quantity) <= 0) {
+      alert('This donation is no longer available. All items have been claimed.');
+      return;
+    }
+
     setSelectedDonation(donation);
     // If specific needed quantity is known and less than donation quantity, use it. 
     // Otherwise clamp to 1 initially.
@@ -613,12 +619,22 @@ function BrowseContent() {
 
                       <div className={styles.donationActions}>
                         {user && donation.user.id !== user.uid ? (
-                          <button
-                            className={styles.requestBtn}
-                            onClick={() => openRequestModal(donation)}
-                          >
-                            Request Donation
-                          </button>
+                          parseInt(donation.quantity) <= 0 ? (
+                            <button
+                              className={styles.requestBtn}
+                              style={{ backgroundColor: 'rgb(204 204 204)', cursor: 'not-allowed' }}
+                              disabled
+                            >
+                              All Items Claimed
+                            </button>
+                          ) : (
+                            <button
+                              className={styles.requestBtn}
+                              onClick={() => openRequestModal(donation)}
+                            >
+                              Request Donation
+                            </button>
+                          )
                         ) : (
                           <button
                             className={styles.requestBtn}
