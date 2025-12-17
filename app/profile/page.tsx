@@ -99,11 +99,10 @@ export default function ProfilePage() {
 
   // Fetch all badge definitions
   // Fetch all badge definitions
+  // Use local badge definitions to avoid permission errors
   useEffect(() => {
-    const badgesRef = ref(db, 'badges');
-    // Fallback data in case of permission denied or empty DB
-    // Expanded to include all badges from seedBadges.ts
-    const fallbackBadges = [
+    // Defines all available badges
+    const localBadges = [
       { id: 'donation_starter', name: 'Donation Starter', description: 'Donate 1 item', icon: 'hand-holding-heart' },
       { id: 'rising_donor', name: 'Rising Donor', description: 'Complete your first donation', icon: 'hand-holding-heart' },
       { id: 'donation_hero', name: 'Donation Hero', description: 'Donate 5+ items', icon: 'hand-holding-heart' },
@@ -135,23 +134,7 @@ export default function ProfilePage() {
       { id: 'generous_soul', name: 'Generous Soul', description: 'Donated 5+ items', icon: 'hand-holding-heart' },
     ];
 
-    const unsubscribe = onValue(badgesRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const badgesData = snapshot.val();
-        const badgesList = Object.entries(badgesData).map(([key, value]: [string, any]) => ({
-          id: key,
-          ...value
-        }));
-        setAllBadges(badgesList);
-      } else {
-        // If no badges in DB, use fallback
-        setAllBadges(fallbackBadges);
-      }
-    }, (error) => {
-      console.warn("Error fetching badges (using fallback):", error);
-      setAllBadges(fallbackBadges);
-    });
-    return () => unsubscribe();
+    setAllBadges(localBadges);
   }, []);
 
   // Format member since date

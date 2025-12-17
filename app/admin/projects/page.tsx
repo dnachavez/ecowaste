@@ -101,7 +101,7 @@ export default function ProjectsManagement() {
   };
 
   const handleSyncRecyclingCounts = async () => {
-    if (!confirm('This will recalculate "Items Recycled" for ALL users based on the number of COMPLETED projects (1 project = 1 item). Continue?')) return;
+    if (!confirm('This will recalculate "Items Recycled" (Material Types) and "Projects Completed" (Count) for ALL users. Continue?')) return;
 
     setLoading(true);
     try {
@@ -112,12 +112,23 @@ export default function ProjectsManagement() {
 
       // 2. Calculate totals per user
       const userRecyclingCounts: Record<string, number> = {};
+      const userProjectCounts: Record<string, number> = {};
 
       Object.values(projectsData).forEach((proj: any) => {
         // Only count completed projects
         if (proj.status === 'completed' && proj.authorId) {
-          // Count 1 per project
-          userRecyclingCounts[proj.authorId] = (userRecyclingCounts[proj.authorId] || 0) + 1;
+          // Recycling Count = Number of Material TYPES
+          // Check if materials exist and is an array or object
+          let projectTotal = 0;
+          if (proj.materials) {
+            const mats = Array.isArray(proj.materials) ? proj.materials : Object.values(proj.materials);
+            projectTotal = mats.length; // Count types, not quantity
+          }
+
+          userRecyclingCounts[proj.authorId] = (userRecyclingCounts[proj.authorId] || 0) + projectTotal;
+
+          // Projects Completed Count = 1 per project
+          userProjectCounts[proj.authorId] = (userProjectCounts[proj.authorId] || 0) + 1;
         }
       });
 
@@ -127,11 +138,29 @@ export default function ProjectsManagement() {
       const usersData = usersSnap.val() || {};
 
       const updatePromises = Object.keys(usersData).map(async (userId) => {
-        const correctCount = userRecyclingCounts[userId] || 0;
-        const currentCount = usersData[userId].recyclingCount;
+        const correctRecyclingCount = userRecyclingCounts[userId] || 0;
+        const correctProjectCount = userProjectCounts[userId] || 0;
 
-        if (currentCount !== correctCount) {
-          await update(ref(db, `users/${userId}`), { recyclingCount: correctCount });
+        const currentRecyclingCount = usersData[userId].recyclingCount;
+        const currentProjectsCompleted = usersData[userId].projectsCompleted;
+
+        let updates: any = {};
+        let needsUpdate = false;
+
+        // Sync Recycling Count
+        if (currentRecyclingCount !== correctRecyclingCount) {
+          updates.recyclingCount = correctRecyclingCount;
+          needsUpdate = true;
+        }
+
+        // Sync Projects Completed
+        if (currentProjectsCompleted !== correctProjectCount) {
+          updates.projectsCompleted = correctProjectCount;
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          await update(ref(db, `users/${userId}`), updates);
           return 1;
         }
         return 0;
@@ -140,7 +169,7 @@ export default function ProjectsManagement() {
       const results = await Promise.all(updatePromises);
       const updatedCount = results.reduce((a: number, b) => a + b, 0);
 
-      alert(`Sync Complete! Updated recycling counts for ${updatedCount} users.`);
+      alert(`Sync Complete! Updated stats (Recycling & Projects) for ${updatedCount} users.`);
 
     } catch (error) {
       console.error("Error syncing recycling counts:", error);
@@ -265,6 +294,14 @@ export default function ProjectsManagement() {
                       <option value="public">Public</option>
                       <option value="private">Private</option>
                     </select>
+                  </div>
+                  <div className={styles.headerActions}>
+                    <button onClick={handleSyncRecyclingCounts} className={styles.syncBtn} disabled={loading}>
+                      {loading ? 'Syncing...' : 'Sync Project Stats'}
+                    </button>
+                    <button onClick={() => setShowCreateModal(true)} className={styles.createBtn}>
+                      <i className="fas fa-plus"></i> Create Project
+                    </button>
                   </div>
                   <div className={styles.modalActions}>
                     <button type="button" className={styles.cancelBtn} onClick={() => setIsEditModalOpen(false)}>Cancel</button>

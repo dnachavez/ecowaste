@@ -897,8 +897,12 @@ export default function ProjectDetailsPage() {
         // Increment project count stat
         await incrementAction(user.uid, 'project', 1);
 
-        // Also increment recycling count (1 per project as per user request)
-        await incrementAction(user.uid, 'recycle', 1);
+        // Increment recycling count (Number of Material Types)
+        // User Request: "Project 1 uses 2 materials (plastic and cans) -> counts as 2 items"
+        const totalMaterialTypes = project.materials?.length || 0;
+        if (totalMaterialTypes > 0) {
+          await incrementAction(user.uid, 'recycle', totalMaterialTypes);
+        }
       }
 
       showToast(`Project successfully ${shareOption === 'community' ? 'shared to community' : 'marked as private'}!`, 'success');
