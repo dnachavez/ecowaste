@@ -1516,6 +1516,45 @@ export default function ProjectDetailsPage() {
                           </div>
                         </div>
 
+                        {contributors.length > 0 && (
+                          <div style={{ marginTop: '20px', marginBottom: '30px' }}>
+                            <h3 style={{ fontSize: '1.2rem', color: '#555', marginBottom: '15px' }}>
+                              <i className="fas fa-hand-holding-heart" style={{ marginRight: '8px', color: '#e91e63' }}></i>
+                              Contributors
+                            </h3>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px' }}>
+                              {contributors.map((contributorName, index) => (
+                                <div key={index} style={{
+                                  backgroundColor: '#fff',
+                                  border: '1px solid #eee',
+                                  borderRadius: '20px',
+                                  padding: '8px 16px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                                }}>
+                                  <div style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '50%',
+                                    backgroundColor: '#2e8b57',
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '12px',
+                                    marginRight: '8px',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    {contributorName.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span style={{ color: '#333', fontWeight: 500 }}>{contributorName}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <div className={styles['stage-actions']} style={{ gap: '10px' }}>
                           <button
                             className={`${styles['btn']} ${styles['primary']}`}
