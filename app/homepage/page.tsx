@@ -245,6 +245,10 @@ function HomepageContent() {
               }))
               : []
           };
+        }).filter(donation => {
+          // HIDE donations with 0 quantity from homepage
+          const qty = parseInt(donation.quantity);
+          return !isNaN(qty) && qty > 0;
         });
         // Sort by date desc
         loadedDonations.sort(() => {

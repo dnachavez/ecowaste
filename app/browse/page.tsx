@@ -223,6 +223,10 @@ function BrowseContent() {
               }))
               : []
           };
+        }).filter(donation => {
+          // Hide 0 quantity donations
+          const qty = parseInt(donation.quantity);
+          return !isNaN(qty) && qty > 0;
         });
         // Sort by date desc
         loadedDonations.sort(() => {
