@@ -10,7 +10,7 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './homepage.module.css';
 import { db } from '../../lib/firebase';
 import { ref, push, onValue } from 'firebase/database';
-import { incrementAction, getUserDisplayAvatar } from '../../lib/gamification';
+import { getUserDisplayAvatar, incrementAction } from '../../lib/gamification';
 
 import RecycledIdeaPopup, { RecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
 
@@ -217,8 +217,9 @@ function HomepageContent() {
       if (data) {
         // Calculate Quick Stats (Donated)
         if (user) {
-          const userDonationsCount = Object.values(data).filter((d) => d.userId === user.uid).length;
-          setQuickStats(prev => ({ ...prev, donated: userDonationsCount }));
+          // Stats now come from user object directly in separate effect or synced via rawUsers if needed, 
+          // but relying on the user object from AuthContext or a specific user listener is better.
+          // For now, removing manual count here as we will set it from user data.
         }
 
         const loadedDonations = Object.entries(data).map(([key, value]) => {
@@ -256,7 +257,7 @@ function HomepageContent() {
         setDonations(loadedDonations);
       } else {
         setDonations([]);
-        if (user) setQuickStats(prev => ({ ...prev, donated: 0 }));
+        // Stats handled by user data
       }
     });
 
@@ -445,6 +446,9 @@ function HomepageContent() {
       const donationsRef = ref(db, 'donations');
       await push(donationsRef, donationData);
 
+      // Increment donation count (Listing-Based)
+      await incrementAction(user.uid, 'donate', 1);
+
       setShowDonationPopup(false);
       setShowSuccessPopup(true);
 
@@ -551,16 +555,21 @@ function HomepageContent() {
             date: p.createdAt
           })));
 
-          // Count completed projects for stats
-          const completedCount = myProjects.filter(p => p.status === 'completed').length;
-          setQuickStats(prev => ({ ...prev, recycled: completedCount }));
+          setUserProjects(myProjects.map(p => ({
+            id: p.id,
+            title: p.title,
+            description: p.description,
+            date: p.createdAt
+          })));
+
+          // Stats now come from user object directly
         }
 
       } else {
         setRecycledIdeas([]);
         if (user) {
           setUserProjects([]);
-          setQuickStats(prev => ({ ...prev, recycled: 0 }));
+          // Stats handled by user data
         }
       }
     });
@@ -568,14 +577,24 @@ function HomepageContent() {
     return () => unsubscribe();
   }, [user]);
 
-  // Fetch Users for Leaderboard
+  // Fetch Users for Leaderboard and Stats
   useEffect(() => {
     const usersRef = ref(db, 'users');
     const unsubscribe = onValue(usersRef, (snapshot) => {
-      setRawUsers(snapshot.val() as Record<string, FirebaseUser> || {});
+      const data = snapshot.val() as Record<string, FirebaseUser> || {};
+      setRawUsers(data);
+
+      // Update Quick Stats from current user data
+      if (user && data[user.uid]) {
+        const userData = data[user.uid] as any; // Cast to access dynamic props like recyclingCount
+        setQuickStats({
+          recycled: userData.recyclingCount || 0,
+          donated: userData.donationCount || 0
+        });
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   // Calculate Leaderboard
   const leaderboardData = useMemo(() => {

@@ -13,6 +13,7 @@ interface Project {
   id: string;
   title: string;
   authorName: string;
+  authorId?: string;
   status: string;
   visibility: string;
   createdAt: string;
@@ -34,16 +35,17 @@ export default function ProjectsManagement() {
       const data = snapshot.val();
       if (data) {
         const projectsList = Object.entries(data).map(([key, value]) => {
-            const val = value as Record<string, string | undefined>;
-            return {
-                id: key,
-                title: val.title || 'Untitled',
-                authorName: val.authorName || 'Anonymous',
-                status: val.status || 'In Progress',
-                visibility: val.visibility || 'private',
-                createdAt: val.created_at || val.createdAt || 'N/A', // Handle inconsistent naming
-                description: val.description || ''
-            };
+          const val = value as Record<string, string | undefined>;
+          return {
+            id: key,
+            title: val.title || 'Untitled',
+            authorName: val.authorName || 'Anonymous',
+            authorId: val.authorId,
+            status: val.status || 'In Progress',
+            visibility: val.visibility || 'private',
+            createdAt: val.created_at || val.createdAt || 'N/A', // Handle inconsistent naming
+            description: val.description || ''
+          };
         });
         setProjects(projectsList);
       } else {
@@ -92,21 +94,81 @@ export default function ProjectsManagement() {
   };
 
   const getStatusClass = (status: string) => {
-      const s = status.toLowerCase();
-      if (s === 'completed') return styles.statusCompleted;
-      if (s === 'in progress') return styles.statusInProgress;
-      return styles.statusOther;
+    const s = status.toLowerCase();
+    if (s === 'completed') return styles.statusCompleted;
+    if (s === 'in progress') return styles.statusInProgress;
+    return styles.statusOther;
+  };
+
+  const handleSyncRecyclingCounts = async () => {
+    if (!confirm('This will recalculate "Items Recycled" for ALL users based on the number of COMPLETED projects (1 project = 1 item). Continue?')) return;
+
+    setLoading(true);
+    try {
+      // 1. Fetch all projects
+      const projectsRef = ref(db, 'projects');
+      const snap = await import('firebase/database').then(m => m.get(projectsRef));
+      const projectsData = snap.val() || {};
+
+      // 2. Calculate totals per user
+      const userRecyclingCounts: Record<string, number> = {};
+
+      Object.values(projectsData).forEach((proj: any) => {
+        // Only count completed projects
+        if (proj.status === 'completed' && proj.authorId) {
+          // Count 1 per project
+          userRecyclingCounts[proj.authorId] = (userRecyclingCounts[proj.authorId] || 0) + 1;
+        }
+      });
+
+      // 3. Update Users
+      const usersRef = ref(db, 'users');
+      const usersSnap = await import('firebase/database').then(m => m.get(usersRef));
+      const usersData = usersSnap.val() || {};
+
+      const updatePromises = Object.keys(usersData).map(async (userId) => {
+        const correctCount = userRecyclingCounts[userId] || 0;
+        const currentCount = usersData[userId].recyclingCount;
+
+        if (currentCount !== correctCount) {
+          await update(ref(db, `users/${userId}`), { recyclingCount: correctCount });
+          return 1;
+        }
+        return 0;
+      });
+
+      const results = await Promise.all(updatePromises);
+      const updatedCount = results.reduce((a: number, b) => a + b, 0);
+
+      alert(`Sync Complete! Updated recycling counts for ${updatedCount} users.`);
+
+    } catch (error) {
+      console.error("Error syncing recycling counts:", error);
+      alert("Failed to sync recycling counts.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <AdminRoute>
-        <Header />
+      <Header />
 
-        <div className={styles.container}>
+      <div className={styles.container}>
         <AdminSidebar />
         <main className={styles.mainContent}>
-          <h1 className={styles.title}>Manage Projects</h1>
-          
+          <div className={styles.headerActions} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h1 className={styles.title} style={{ margin: 0 }}>Manage Projects</h1>
+            <button
+              onClick={handleSyncRecyclingCounts}
+              className={styles.saveBtn}
+              style={{ backgroundColor: '#2196F3', marginLeft: '15px' }}
+            >
+              <i className="fas fa-recycle" style={{ marginRight: '8px' }}></i>
+              Sync Recycling Counts
+            </button>
+          </div>
+
           {loading ? (
             <p>Loading projects...</p>
           ) : (
@@ -128,21 +190,21 @@ export default function ProjectsManagement() {
                       <td>{project.title}</td>
                       <td>{project.authorName}</td>
                       <td>
-                          <span className={`${styles.statusBadge} ${getStatusClass(project.status)}`}>
-                            {project.status}
-                          </span>
+                        <span className={`${styles.statusBadge} ${getStatusClass(project.status)}`}>
+                          {project.status}
+                        </span>
                       </td>
                       <td>{project.visibility}</td>
                       <td>{project.createdAt}</td>
                       <td>
-                        <button 
+                        <button
                           className={`${styles.actionBtn} ${styles.editBtn}`}
                           onClick={() => handleEditClick(project)}
                           title="Edit Project"
                         >
                           <i className="fas fa-edit"></i>
                         </button>
-                        <button 
+                        <button
                           className={`${styles.actionBtn} ${styles.deleteBtn}`}
                           onClick={() => handleDeleteProject(project.id)}
                           title="Delete Project"
@@ -154,7 +216,7 @@ export default function ProjectsManagement() {
                   ))}
                   {projects.length === 0 && (
                     <tr>
-                      <td colSpan={6} style={{textAlign: 'center', padding: '20px'}}>No projects found</td>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>No projects found</td>
                     </tr>
                   )}
                 </tbody>
@@ -169,25 +231,25 @@ export default function ProjectsManagement() {
                 <form onSubmit={handleSaveProject}>
                   <div className={styles.formGroup}>
                     <label>Title</label>
-                    <input 
-                      type="text" 
-                      value={currentProject.title} 
-                      onChange={e => setCurrentProject({...currentProject, title: e.target.value})}
-                      required 
+                    <input
+                      type="text"
+                      value={currentProject.title}
+                      onChange={e => setCurrentProject({ ...currentProject, title: e.target.value })}
+                      required
                     />
                   </div>
                   <div className={styles.formGroup}>
                     <label>Description</label>
-                    <textarea 
-                      value={currentProject.description} 
-                      onChange={e => setCurrentProject({...currentProject, description: e.target.value})}
+                    <textarea
+                      value={currentProject.description}
+                      onChange={e => setCurrentProject({ ...currentProject, description: e.target.value })}
                     />
                   </div>
                   <div className={styles.formGroup}>
                     <label>Status</label>
-                    <select 
-                      value={currentProject.status} 
-                      onChange={e => setCurrentProject({...currentProject, status: e.target.value})}
+                    <select
+                      value={currentProject.status}
+                      onChange={e => setCurrentProject({ ...currentProject, status: e.target.value })}
                     >
                       <option value="In Progress">In Progress</option>
                       <option value="Completed">Completed</option>
@@ -196,9 +258,9 @@ export default function ProjectsManagement() {
                   </div>
                   <div className={styles.formGroup}>
                     <label>Visibility</label>
-                    <select 
-                      value={currentProject.visibility} 
-                      onChange={e => setCurrentProject({...currentProject, visibility: e.target.value})}
+                    <select
+                      value={currentProject.visibility}
+                      onChange={e => setCurrentProject({ ...currentProject, visibility: e.target.value })}
                     >
                       <option value="public">Public</option>
                       <option value="private">Private</option>

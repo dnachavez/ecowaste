@@ -897,23 +897,8 @@ export default function ProjectDetailsPage() {
         // Increment project count stat
         await incrementAction(user.uid, 'project', 1);
 
-        // Also increment recycling count based on materials used
-        // Calculate total quantity of materials in the project
-        let totalRecycledItems = 0;
-        const materialsList = project.materials ? (Array.isArray(project.materials) ? project.materials : Object.values(project.materials)) : [];
-
-        if (materialsList.length > 0) {
-          totalRecycledItems = materialsList.reduce((acc: number, mat: any) => {
-            // Use acquired (actual amount) or needed (target amount)
-            // Fallback to 0 if neither exists
-            const qty = mat.acquired || mat.needed || 0;
-            return acc + (typeof qty === 'number' ? qty : parseInt(qty) || 0);
-          }, 0);
-        }
-
-        if (totalRecycledItems > 0) {
-          await incrementAction(user.uid, 'recycle', totalRecycledItems);
-        }
+        // Also increment recycling count (1 per project as per user request)
+        await incrementAction(user.uid, 'recycle', 1);
       }
 
       showToast(`Project successfully ${shareOption === 'community' ? 'shared to community' : 'marked as private'}!`, 'success');

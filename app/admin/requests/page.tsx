@@ -153,6 +153,54 @@ export default function RequestsManagement() {
     }
   };
 
+  const handleSyncDonationCounts = async () => {
+    if (!confirm('This will recalculate "Total Donations" for ALL users based on their ACTIVE LISTINGS in "My Donations". This aligns the count with the "My Donations" tab. Continue?')) return;
+
+    setLoading(true);
+    try {
+      // 1. Fetch all donations (Listings)
+      const donationsRef = ref(db, 'donations');
+      const snap = await import('firebase/database').then(m => m.get(donationsRef));
+      const donationsData = snap.val() || {};
+
+      // 2. Count listings per user
+      const userDonationCounts: Record<string, number> = {};
+
+      Object.values(donationsData).forEach((donation: any) => {
+        if (donation.userId) {
+          userDonationCounts[donation.userId] = (userDonationCounts[donation.userId] || 0) + 1;
+        }
+      });
+
+      // 3. Update Users
+      const usersRef = ref(db, 'users');
+      const usersSnap = await import('firebase/database').then(m => m.get(usersRef));
+      const usersData = usersSnap.val() || {};
+
+      const updatePromises = Object.keys(usersData).map(async (userId) => {
+        const correctCount = userDonationCounts[userId] || 0;
+        const currentCount = usersData[userId].donationCount;
+
+        if (currentCount !== correctCount) {
+          await update(ref(db, `users/${userId}`), { donationCount: correctCount });
+          return 1;
+        }
+        return 0;
+      });
+
+      const results = await Promise.all(updatePromises);
+      const updatedCount = results.reduce((a: number, b) => a + b, 0);
+
+      alert(`Sync Complete! Updated donation counts for ${updatedCount} users.`);
+
+    } catch (error) {
+      console.error("Error syncing donation counts:", error);
+      alert("Failed to sync donation counts.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AdminRoute>
       <Header />
@@ -160,7 +208,17 @@ export default function RequestsManagement() {
       <div className={styles.container}>
         <AdminSidebar />
         <main className={styles.mainContent}>
-          <h1 className={styles.title}>Manage Requests</h1>
+          <div className={styles.headerActions} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h1 className={styles.title} style={{ margin: 0 }}>Manage Requests</h1>
+            <button
+              onClick={handleSyncDonationCounts}
+              className={styles.saveBtn}
+              style={{ backgroundColor: '#ff9800', marginLeft: '15px' }}
+            >
+              <i className="fas fa-sync" style={{ marginRight: '8px' }}></i>
+              Sync Donation Counts
+            </button>
+          </div>
 
           {loading ? (
             <p>Loading requests...</p>
