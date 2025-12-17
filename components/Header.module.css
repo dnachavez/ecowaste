@@ -85,7 +85,7 @@
   right: 0;
   background-color: white;
   border-radius: 5px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   width: 200px;
   z-index: 100;
   display: none;
@@ -165,7 +165,7 @@
   right: -60px;
   background-color: white;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   width: 320px;
   z-index: 1000;
   overflow: hidden;
@@ -252,10 +252,25 @@
   font-size: 14px;
 }
 
-.notificationIcon.info { background-color: #e3f2fd; color: #2196f3; }
-.notificationIcon.success { background-color: #e8f5e9; color: #4caf50; }
-.notificationIcon.warning { background-color: #fff3e0; color: #ff9800; }
-.notificationIcon.error { background-color: #ffebee; color: #f44336; }
+.notificationIcon.info {
+  background-color: #e3f2fd;
+  color: #2196f3;
+}
+
+.notificationIcon.success {
+  background-color: #e8f5e9;
+  color: #4caf50;
+}
+
+.notificationIcon.warning {
+  background-color: #fff3e0;
+  color: #ff9800;
+}
+
+.notificationIcon.error {
+  background-color: #ffebee;
+  color: #f44336;
+}
 
 .notificationContent {
   flex: 1;
@@ -294,4 +309,56 @@
 .emptyNotifications i {
   font-size: 24px;
   color: #ccc;
+}
+
+/* Avatar Animations */
+.animated {
+  animation: float 3s ease-in-out infinite;
+}
+
+.special {
+  animation: pulse-glow 2s infinite alternate;
+  box-shadow: 0 0 5px rgba(255, 215, 0, 0.6);
+}
+
+.special img {
+  animation: gentle-spin 10s linear infinite;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 5px rgba(130, 170, 82, 0.4);
+  }
+
+  100% {
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.6), 0 0 5px rgba(130, 170, 82, 0.4);
+  }
+}
+
+@keyframes gentle-spin {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
