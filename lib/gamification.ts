@@ -19,10 +19,10 @@ export interface AvatarReward {
 }
 
 export const AVATAR_REWARDS: AvatarReward[] = [
-  { level: 10, id: 'avatar_lvl10', name: 'Eco Novice', description: 'A basic avatar for reaching Level 10.', type: 'basic', preview: '🌱' },
-  { level: 20, id: 'avatar_lvl20', name: 'Green Guardian', description: 'Better design for Level 20 achievers.', type: 'improved', preview: '🌿' },
-  { level: 30, id: 'avatar_lvl30', name: 'Earth Defender', description: 'Animated avatar for Level 30.', type: 'animated', preview: '✨' },
-  { level: 50, id: 'avatar_lvl50', name: 'Gaia Champion', description: 'Ultimate animated avatar with effects.', type: 'special', preview: '🌟' }
+  { level: 10, id: 'avatar_lvl10', name: 'Eco Buddy', description: 'Your friendly recycling companion.', type: 'basic', preview: '/avatars/eco_buddy.png' },
+  { level: 20, id: 'avatar_lvl20', name: 'Aqua Pal', description: 'A cheerful guardian of clean water.', type: 'improved', preview: '/avatars/water_drop.png' },
+  { level: 30, id: 'avatar_lvl30', name: 'Recycle Hero', description: 'A super defender of the planet.', type: 'animated', preview: '/avatars/recycle_hero.png' },
+  { level: 50, id: 'avatar_lvl50', name: 'Sierra Madre', description: 'The ultimate spirit of nature.', type: 'special', preview: '/avatars/sierra_madre.png' }
 ];
 
 export const BADGES: Record<string, Badge> = {

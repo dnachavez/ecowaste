@@ -671,18 +671,32 @@ export default function Achievements() {
                                                         border: isUnlocked ? '1px solid #4caf50' : '1px solid #ddd',
                                                         opacity: isUnlocked ? 1 : 0.7
                                                     }}>
-                                                        <div style={{
-                                                            fontSize: '30px',
-                                                            width: '60px',
-                                                            height: '60px',
+                                                        <div className={`${styles.avatarRewardPreview} ${isUnlocked ? styles[reward.type] : ''}`} style={{
+                                                            width: '80px',
+                                                            height: '80px',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
                                                             background: 'white',
                                                             borderRadius: '50%',
-                                                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                                                            overflow: 'hidden',
+                                                            position: 'relative'
                                                         }}>
-                                                            {reward.preview}
+                                                            <Image
+                                                                src={reward.preview}
+                                                                alt={reward.name}
+                                                                width={80}
+                                                                height={80}
+                                                                className={styles.avatarImage}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    objectFit: 'cover',
+                                                                    opacity: isUnlocked ? 1 : 0.5,
+                                                                    filter: isUnlocked ? 'none' : 'grayscale(100%)'
+                                                                }}
+                                                            />
                                                         </div>
                                                         <div style={{ flex: 1 }}>
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

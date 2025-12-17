@@ -208,8 +208,8 @@ export default function Header() {
       const reward = AVATAR_REWARDS.find(r => r.id === equippedAvatar);
       if (reward) {
         return (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e8f5e9', fontSize: '24px' }}>
-            {reward.preview}
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e8f5e9', overflow: 'hidden' }}>
+            <img src={reward.preview} alt={reward.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
         );
       }
@@ -412,7 +412,7 @@ export default function Header() {
                       position: 'relative'
                     }}
                   >
-                    <div style={{
+                    <div className={isUnlocked ? styles[reward.type] : ''} style={{
                       width: '60px',
                       height: '60px',
                       margin: '0 auto 10px',
@@ -421,12 +421,22 @@ export default function Header() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '30px'
+                      overflow: 'hidden',
+                      position: 'relative'
                     }}>
-                      {reward.preview}
+                      <img
+                        src={reward.preview}
+                        alt={reward.name}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          filter: isUnlocked ? 'none' : 'grayscale(100%) opacity(0.5)'
+                        }}
+                      />
                     </div>
                     <h4 style={{ margin: '5px 0 0', fontSize: '14px' }}>{reward.name}</h4>
-                    <div style={{ fontSize: '11px', color: '#445933ff' }}>Lvl {reward.level}</div>
+                    <div style={{ fontSize: '11px', color: '#666' }}>Lvl {reward.level}</div>
 
                     {isEquipped && <span style={{ fontSize: '12px', color: '#4caf50', fontWeight: 'bold' }}>Equipped</span>}
                     {!isUnlocked && <span style={{ fontSize: '12px', color: '#666' }}><i className="fas fa-lock"></i> Locked</span>}

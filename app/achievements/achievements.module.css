@@ -1049,3 +1049,65 @@
         transform: translateY(-10px);
     }
 }
+
+/* Avatar Reward Animations */
+.avatarRewardPreview {
+    transition: transform 0.3s ease;
+}
+
+.avatarRewardPreview:hover {
+    transform: scale(1.1);
+}
+
+.animated {
+    animation: float 3s ease-in-out infinite;
+}
+
+.special {
+    animation: pulse-glow 2s infinite alternate;
+    border: 2px solid #FFD700 !important;
+    /* Gold border for Sierra Madre */
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6) !important;
+}
+
+.special img {
+    animation: gentle-spin 10s linear infinite;
+}
+
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+@keyframes pulse-glow {
+    0% {
+        box-shadow: 0 0 10px rgba(130, 170, 82, 0.5);
+    }
+
+    100% {
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 10px rgba(130, 170, 82, 0.5);
+    }
+}
+
+@keyframes gentle-spin {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
