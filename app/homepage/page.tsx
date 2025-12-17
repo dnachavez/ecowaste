@@ -579,42 +579,23 @@ function HomepageContent() {
 
   // Calculate Leaderboard
   const leaderboardData = useMemo(() => {
-    if (Object.keys(rawUsers).length === 0 && Object.keys(rawDonations).length === 0 && Object.keys(rawProjects).length === 0) return [];
-
-    const userPoints: Record<string, number> = {};
-
-    // Initialize users with 0 points
-    Object.keys(rawUsers).forEach(userId => {
-      userPoints[userId] = 0;
-    });
-
-    // Calculate points from Donations (10 pts)
-    Object.values(rawDonations).forEach((donation) => {
-      if (donation.userId && userPoints[donation.userId] !== undefined) {
-        userPoints[donation.userId] += 10;
-      } else if (donation.userId) {
-        // In case user is not in users list (shouldn't happen but safe to add)
-        userPoints[donation.userId] = (userPoints[donation.userId] || 0) + 10;
-      }
-    });
-
-    // Calculate points from Completed Projects (20 pts)
-    Object.values(rawProjects).forEach((project) => {
-      if (project.authorId && project.status === 'completed') {
-        userPoints[project.authorId] = (userPoints[project.authorId] || 0) + 20;
-      }
-    });
+    if (Object.keys(rawUsers).length === 0) return [];
 
     // Convert to array and sort
-    return Object.entries(userPoints)
-      .map(([userId, points]) => {
-        const userInfo = rawUsers[userId] || {};
-        const fullName = userInfo.fullName || 'Unknown User'; // Check property name in users node
+    return Object.entries(rawUsers)
+      .map(([userId, userInfo]) => {
+        // Cast to any because the interface defined locally might be outdated or strict
+        // In a real scenario, we'd update the FirebaseUser interface to include xp
+        const user = userInfo as any;
+        const fullName = user.fullName || 'Unknown User';
+        const points = user.xp || 0;
+
         return {
           id: userId,
           name: fullName,
           points: points,
-          avatar: fullName.charAt(0).toUpperCase()
+          avatar: user.photoURL || user.avatar || fullName.charAt(0).toUpperCase(),
+          rank: 0 // placeholder
         };
       })
       .filter(user => user.points > 0)
@@ -624,7 +605,7 @@ function HomepageContent() {
         ...user,
         rank: index + 1
       }));
-  }, [rawUsers, rawDonations, rawProjects]);
+  }, [rawUsers]);
 
   useEffect(() => {
     if (donationId && donations.length > 0) {
