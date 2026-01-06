@@ -18,6 +18,7 @@ export default function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false); // New Mobile State
   const [showAvatarModal, setShowAvatarModal] = useState(false); // New state
   const [equippedBadge, setEquippedBadge] = useState<string>('');
   const [equippedBorder, setEquippedBorder] = useState<string>('');
@@ -322,131 +323,188 @@ export default function Header() {
             </div>
           )}
         </div>
+
+        {/* Mobile Hamburger Button */}
+        <button
+          className={styles.hamburgerBtn}
+          onClick={() => setShowMobileMenu(true)}
+        >
+          <i className="fas fa-bars"></i>
+        </button>
       </div>
-      {showAvatarModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            padding: '25px',
-            width: '90%',
-            maxWidth: '500px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
-            position: 'relative'
-          }}>
-            <button
-              onClick={() => setShowAvatarModal(false)}
-              style={{
-                position: 'absolute',
-                top: '15px',
-                right: '15px',
-                border: 'none',
-                background: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#666'
-              }}
-            >
-              ×
-            </button>
 
-            <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#2e8b57', textAlign: 'center' }}>Choose Your Avatar</h2>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '15px' }}>
-              {/* Default Avatar Option */}
-              <div
-                onClick={() => handleEquipAvatar('default')}
-                style={{
-                  border: equippedAvatar === 'default' || !equippedAvatar ? '3px solid #4caf50' : '1px solid #ddd',
-                  borderRadius: '10px',
-                  padding: '10px',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  backgroundColor: equippedAvatar === 'default' || !equippedAvatar ? '#446447ff' : 'white',
-                  transition: 'transform 0.2s',
-                }}
-              >
-                <div style={{ width: '60px', height: '60px', margin: '0 auto 10px', borderRadius: '50%', overflow: 'hidden' }}>
-                  {user && user.photoURL ? (
-                    <img src={user.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3d6a06', color: 'white', fontWeight: 'bold', fontSize: '24px' }}>
-                      {user && user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
-                    </div>
-                  )}
-                </div>
-                <h4 style={{ margin: '5px 0 0', fontSize: '14px' }}>Default</h4>
-                {equippedAvatar === 'default' || !equippedAvatar ? <span style={{ fontSize: '12px', color: '#4caf50', fontWeight: 'bold' }}>Equipped</span> : null}
+      {/* Mobile Menu Overlay */}
+      {
+        showMobileMenu && (
+          <div className={styles.mobileMenuOverlay}>
+            <div className={styles.mobileMenu}>
+              <div className={styles.mobileMenuHeader}>
+                <h2>Menu</h2>
+                <button
+                  className={styles.closeMenuBtn}
+                  onClick={() => setShowMobileMenu(false)}
+                >
+                  <i className="fas fa-times"></i>
+                </button>
               </div>
 
-              {/* Rewards */}
-              {AVATAR_REWARDS.map(reward => {
-                const isUnlocked = userLevel >= reward.level;
-                const isEquipped = equippedAvatar === reward.id;
-
-                return (
-                  <div
-                    key={reward.id}
-                    onClick={() => isUnlocked ? handleEquipAvatar(reward.id) : null}
-                    style={{
-                      border: isEquipped ? '3px solid #4caf50' : '1px solid #ddd',
-                      borderRadius: '10px',
-                      padding: '10px',
-                      cursor: isUnlocked ? 'pointer' : 'not-allowed',
-                      textAlign: 'center',
-                      backgroundColor: isEquipped ? '#446447ff' : isUnlocked ? 'white' : '#f5f5f5',
-                      opacity: isUnlocked ? 1 : 0.6,
-                      position: 'relative'
-                    }}
-                  >
-                    <div className={isUnlocked ? styles[reward.type] : ''} style={{
-                      width: '60px',
-                      height: '60px',
-                      margin: '0 auto 10px',
-                      borderRadius: '50%',
-                      backgroundColor: isUnlocked ? '#e8f5e9' : '#e0e0e0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
-                      position: 'relative'
-                    }}>
-                      <img
-                        src={reward.preview}
-                        alt={reward.name}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          filter: isUnlocked ? 'none' : 'grayscale(100%) opacity(0.5)'
-                        }}
-                      />
-                    </div>
-                    <h4 style={{ margin: '5px 0 0', fontSize: '14px' }}>{reward.name}</h4>
-                    <div style={{ fontSize: '11px', color: '#666' }}>Lvl {reward.level}</div>
-
-                    {isEquipped && <span style={{ fontSize: '12px', color: '#4caf50', fontWeight: 'bold' }}>Equipped</span>}
-                    {!isUnlocked && <span style={{ fontSize: '12px', color: '#666' }}><i className="fas fa-lock"></i> Locked</span>}
-                  </div>
-                );
-              })}
+              <div className={styles.mobileNav}>
+                <Link href="/homepage" className={styles.mobileNavLink} onClick={() => setShowMobileMenu(false)}>
+                  <i className="fas fa-home"></i> Home
+                </Link>
+                <Link href="/browse" className={styles.mobileNavLink} onClick={() => setShowMobileMenu(false)}>
+                  <i className="fas fa-search"></i> Browse
+                </Link>
+                <Link href="/achievements" className={styles.mobileNavLink} onClick={() => setShowMobileMenu(false)}>
+                  <i className="fas fa-star"></i> Achievements
+                </Link>
+                <Link href="/leaderboard" className={styles.mobileNavLink} onClick={() => setShowMobileMenu(false)}>
+                  <i className="fas fa-trophy"></i> Leaderboard
+                </Link>
+                <Link href="/projects" className={styles.mobileNavLink} onClick={() => setShowMobileMenu(false)}>
+                  <i className="fas fa-recycle"></i> Projects
+                </Link>
+                <Link href="/donations" className={styles.mobileNavLink} onClick={() => setShowMobileMenu(false)}>
+                  <i className="fas fa-hand-holding-heart"></i> Donations
+                </Link>
+                <div className={styles.mobileDivider}></div>
+                <Link href="/profile" className={styles.mobileNavLink} onClick={() => setShowMobileMenu(false)}>
+                  <i className="fas fa-user"></i> My Profile
+                </Link>
+                <button onClick={() => { setShowMobileMenu(false); handleLogout(); }} className={styles.mobileNavLink} style={{ border: 'none', background: 'none', width: '100%', textAlign: 'left', fontFamily: 'inherit' }}>
+                  <i className="fas fa-sign-out-alt"></i> Logout
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </header>
+        )
+      }
+      {
+        showAvatarModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              padding: '25px',
+              width: '90%',
+              maxWidth: '500px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+              position: 'relative'
+            }}>
+              <button
+                onClick={() => setShowAvatarModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '15px',
+                  right: '15px',
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                ×
+              </button>
+
+              <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#2e8b57', textAlign: 'center' }}>Choose Your Avatar</h2>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '15px' }}>
+                {/* Default Avatar Option */}
+                <div
+                  onClick={() => handleEquipAvatar('default')}
+                  style={{
+                    border: equippedAvatar === 'default' || !equippedAvatar ? '3px solid #4caf50' : '1px solid #ddd',
+                    borderRadius: '10px',
+                    padding: '10px',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    backgroundColor: equippedAvatar === 'default' || !equippedAvatar ? '#446447ff' : 'white',
+                    transition: 'transform 0.2s',
+                  }}
+                >
+                  <div style={{ width: '60px', height: '60px', margin: '0 auto 10px', borderRadius: '50%', overflow: 'hidden' }}>
+                    {user && user.photoURL ? (
+                      <img src={user.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#3d6a06', color: 'white', fontWeight: 'bold', fontSize: '24px' }}>
+                        {user && user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                    )}
+                  </div>
+                  <h4 style={{ margin: '5px 0 0', fontSize: '14px' }}>Default</h4>
+                  {equippedAvatar === 'default' || !equippedAvatar ? <span style={{ fontSize: '12px', color: '#4caf50', fontWeight: 'bold' }}>Equipped</span> : null}
+                </div>
+
+                {/* Rewards */}
+                {AVATAR_REWARDS.map(reward => {
+                  const isUnlocked = userLevel >= reward.level;
+                  const isEquipped = equippedAvatar === reward.id;
+
+                  return (
+                    <div
+                      key={reward.id}
+                      onClick={() => isUnlocked ? handleEquipAvatar(reward.id) : null}
+                      style={{
+                        border: isEquipped ? '3px solid #4caf50' : '1px solid #ddd',
+                        borderRadius: '10px',
+                        padding: '10px',
+                        cursor: isUnlocked ? 'pointer' : 'not-allowed',
+                        textAlign: 'center',
+                        backgroundColor: isEquipped ? '#446447ff' : isUnlocked ? 'white' : '#f5f5f5',
+                        opacity: isUnlocked ? 1 : 0.6,
+                        position: 'relative'
+                      }}
+                    >
+                      <div className={isUnlocked ? styles[reward.type] : ''} style={{
+                        width: '60px',
+                        height: '60px',
+                        margin: '0 auto 10px',
+                        borderRadius: '50%',
+                        backgroundColor: isUnlocked ? '#e8f5e9' : '#e0e0e0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        position: 'relative'
+                      }}>
+                        <img
+                          src={reward.preview}
+                          alt={reward.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            filter: isUnlocked ? 'none' : 'grayscale(100%) opacity(0.5)'
+                          }}
+                        />
+                      </div>
+                      <h4 style={{ margin: '5px 0 0', fontSize: '14px' }}>{reward.name}</h4>
+                      <div style={{ fontSize: '11px', color: '#666' }}>Lvl {reward.level}</div>
+
+                      {isEquipped && <span style={{ fontSize: '12px', color: '#4caf50', fontWeight: 'bold' }}>Equipped</span>}
+                      {!isUnlocked && <span style={{ fontSize: '12px', color: '#666' }}><i className="fas fa-lock"></i> Locked</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </header >
   );
 }

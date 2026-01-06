@@ -9,10 +9,18 @@ import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './homepage.module.css';
 import { db } from '../../lib/firebase';
-import { ref, push, onValue } from 'firebase/database';
+import { ref, onValue, push, runTransaction, update, get } from 'firebase/database'; // Added update
 import { getUserDisplayAvatar, incrementAction } from '../../lib/gamification';
+import { calculateTimeAgo } from '../../lib/dateUtils';
 
-import RecycledIdeaPopup, { RecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
+import RecycledIdeaPopup, { RecycledIdea as BaseRecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
+
+// Extend the interface locally or assume it allows extra props
+interface RecycledIdea extends BaseRecycledIdea {
+  authorId?: string;
+  date: string;
+}
+
 
 interface Comment {
   id: string;
@@ -27,6 +35,7 @@ interface Donation {
   category: string;
   subCategory: string;
   timeAgo: string;
+  createdAt: string; // Added date field
   quantity: string;
   unit: string;
   description: string;
@@ -132,23 +141,8 @@ function HomepageContent() {
     Electronic: ["Old Phones", "Chargers", "Batteries", "Broken Gadgets"]
   };
 
-  const calculateTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + " years ago";
-    interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + " months ago";
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + " days ago";
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + " hours ago";
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + " minutes ago";
-    return Math.floor(seconds) + " seconds ago";
-  };
+  // Feedback state
+  // ... (rest of the file)
 
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
@@ -234,6 +228,7 @@ function HomepageContent() {
             category: donation.category,
             subCategory: donation.subCategory,
             timeAgo: calculateTimeAgo(donation.createdAt),
+            createdAt: donation.createdAt, // Added createdAt
             quantity: donation.quantity,
             unit: donation.unit || 'Units',
             description: donation.description,
@@ -537,7 +532,9 @@ function HomepageContent() {
             id: project.id,
             title: project.title,
             author: project.authorName || 'Anonymous',
-            timeAgo: project.createdAt,
+            authorId: project.authorId,
+            timeAgo: project.createdAt, // This is used for calculateTimeAgo, which handles the string parsing
+            date: project.createdAt, // Keeping original for display, or reformatting if needed
             image: project.final_images ? project.final_images[0] : '',
             description: project.description,
             commentsCount: 0,
@@ -720,9 +717,14 @@ function HomepageContent() {
                               {donation.user.name}
                             </Link>
                           </div>
-                          <div className={styles.donationMeta}>
+                          <div className={styles.donationMeta} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                             <span className={styles.category}>Category: {donation.category} → {donation.subCategory}</span>
-                            <span className={styles.timeAgo}>{donation.timeAgo}</span>
+                            <span style={{ color: '#888', fontSize: '0.9em' }}>
+                              Date: {new Date(donation.createdAt).toLocaleDateString()}
+                            </span>
+                            <span className={styles.timeAgo} style={{ fontSize: '0.8em', color: '#999', marginTop: '4px' }}>
+                              {donation.timeAgo}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -811,9 +813,22 @@ function HomepageContent() {
                 <div key={idea.id} className={styles.ideaCard}>
                   <div className={styles.ideaHeader}>
                     <h3>{idea.title}</h3>
-                    <div className={styles.ideaMeta}>
-                      <span className={styles.author}>{idea.author}</span>
-                      <span className={styles.timeAgo}>{idea.timeAgo}</span>
+                    <div className={styles.ideaMeta} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <span className={styles.author}>
+                        Project recycled by {idea.authorId ? (
+                          <Link href={`/profile/${idea.authorId}`} style={{ fontWeight: 'bold', color: '#82AA52', textDecoration: 'none' }}>
+                            {idea.author}
+                          </Link>
+                        ) : (
+                          <span style={{ fontWeight: 'bold', color: '#555' }}>{idea.author}</span>
+                        )}
+                        <span style={{ color: '#888', marginLeft: '8px', fontSize: '0.9em' }}>
+                          {new Date(idea.date).toLocaleDateString() !== 'Invalid Date' ? new Date(idea.date).toLocaleDateString() : idea.date}
+                        </span>
+                      </span>
+                      <div className={styles.timeAgo} style={{ fontSize: '0.8em', color: '#999', marginTop: '4px' }}>
+                        {calculateTimeAgo(idea.date)}
+                      </div>
                     </div>
                   </div>
                   <div className={styles.ideaImageContainer}>
@@ -899,273 +914,285 @@ function HomepageContent() {
             </div>
           </div>
         </div>
-      </div>
+      </div >
       {/* Popups */}
-      {showDonationPopup && (
-        <div className={styles.popupContainer} onClick={(e) => {
-          if (e.target === e.currentTarget) handleClosePopup();
-        }}>
-          <div className={styles.popupContent}>
-            <button className={styles.closeBtn} onClick={handleClosePopup}>×</button>
-            <h2>Post Donation</h2>
-            <div className={styles.popupScrollArea}>
-              <form onSubmit={handleSubmit}>
-                <div className={styles.formGroup}>
-                  <label htmlFor="wasteType">Type of Waste:</label>
-                  <select id="wasteType" name="wasteType" required value={formData.wasteType} onChange={handleInputChange}>
-                    <option value="">Select waste type</option>
-                    <option value="Plastic">Plastic</option>
-                    <option value="Paper">Paper</option>
-                    <option value="Metal">Metal</option>
-                    <option value="Glass">Glass</option>
-                    <option value="Electronic">Electronic</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                {formData.wasteType === 'Other' && (
+      {
+        showDonationPopup && (
+          <div className={styles.popupContainer} onClick={(e) => {
+            if (e.target === e.currentTarget) handleClosePopup();
+          }}>
+            <div className={styles.popupContent}>
+              <button className={styles.closeBtn} onClick={handleClosePopup}>×</button>
+              <h2>Post Donation</h2>
+              <div className={styles.popupScrollArea}>
+                <form onSubmit={handleSubmit}>
                   <div className={styles.formGroup}>
-                    <label htmlFor="otherWaste">Please specify:</label>
-                    <input type="text" id="otherWaste" name="otherWaste" placeholder="Type custom waste category..." required value={formData.otherWaste} onChange={handleInputChange} />
-                  </div>
-                )}
-
-                {subcategories[formData.wasteType] && (
-                  <div className={styles.formGroup}>
-                    <label htmlFor="subcategory">Subcategory:</label>
-                    <select id="subcategory" name="subcategory" required value={formData.subcategory} onChange={handleInputChange}>
-                      <option value="">-- Select Subcategory --</option>
-                      {subcategories[formData.wasteType].map(sub => (
-                        <option key={sub} value={sub}>{sub}</option>
-                      ))}
+                    <label htmlFor="wasteType">Type of Waste:</label>
+                    <select id="wasteType" name="wasteType" required value={formData.wasteType} onChange={handleInputChange}>
+                      <option value="">Select waste type</option>
+                      <option value="Plastic">Plastic</option>
+                      <option value="Paper">Paper</option>
+                      <option value="Metal">Metal</option>
+                      <option value="Glass">Glass</option>
+                      <option value="Electronic">Electronic</option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
-                )}
 
-                <div className={styles.formGroup}>
-                  <label htmlFor="quantity">Quantity:</label>
-                  <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" min="1" required value={formData.quantity} onChange={handleInputChange} />
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label htmlFor="description">Description:</label>
-                  <textarea id="description" name="description" placeholder="Describe your donation..." rows={4} required value={formData.description} onChange={handleInputChange}></textarea>
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label htmlFor="photos">Attach Photos (up to 4):</label>
-                  <div className={styles.fileUpload}>
-                    <input type="file" id="photos" name="photos" accept="image/*" multiple onChange={handleFileChange} />
-                    <label htmlFor="photos" className={styles.fileUploadLabel}>Choose Files</label>
-                    <span id="file-chosen">{formData.photos.length > 0 ? `${formData.photos.length} files selected` : 'No files chosen'}</span>
-                  </div>
-
-                  {formData.photos.length > 0 && (
-                    <div className={styles.previewContainer}>
-                      {formData.photos.map((photo, index) => (
-                        <div key={index} className={styles.previewImageWrapper}>
-                          <img
-                            src={URL.createObjectURL(photo)}
-                            alt={`Preview ${index}`}
-                            className={styles.previewImage}
-                            onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
-                          />
-                          <button
-                            type="button"
-                            className={styles.removeImageBtn}
-                            onClick={() => handleRemovePhoto(index)}
-                          >
-                            <i className="fas fa-times"></i>
-                          </button>
-                        </div>
-                      ))}
+                  {formData.wasteType === 'Other' && (
+                    <div className={styles.formGroup}>
+                      <label htmlFor="otherWaste">Please specify:</label>
+                      <input type="text" id="otherWaste" name="otherWaste" placeholder="Type custom waste category..." required value={formData.otherWaste} onChange={handleInputChange} />
                     </div>
                   )}
 
-                  <small className={styles.formHint}>You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
+                  {subcategories[formData.wasteType] && (
+                    <div className={styles.formGroup}>
+                      <label htmlFor="subcategory">Subcategory:</label>
+                      <select id="subcategory" name="subcategory" required value={formData.subcategory} onChange={handleInputChange}>
+                        <option value="">-- Select Subcategory --</option>
+                        {subcategories[formData.wasteType].map(sub => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className={styles.formGroup}>
+                    <label htmlFor="quantity">Quantity:</label>
+                    <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" min="1" required value={formData.quantity} onChange={handleInputChange} />
+                  </div>
+
+                  <div className={styles.formGroup}>
+                    <label htmlFor="description">Description:</label>
+                    <textarea id="description" name="description" placeholder="Describe your donation..." rows={4} required value={formData.description} onChange={handleInputChange}></textarea>
+                  </div>
+
+                  <div className={styles.formGroup}>
+                    <label htmlFor="photos">Attach Photos (up to 4):</label>
+                    <div className={styles.fileUpload}>
+                      <input type="file" id="photos" name="photos" accept="image/*" multiple onChange={handleFileChange} />
+                      <label htmlFor="photos" className={styles.fileUploadLabel}>Choose Files</label>
+                      <span id="file-chosen">{formData.photos.length > 0 ? `${formData.photos.length} files selected` : 'No files chosen'}</span>
+                    </div>
+
+                    {formData.photos.length > 0 && (
+                      <div className={styles.previewContainer}>
+                        {formData.photos.map((photo, index) => (
+                          <div key={index} className={styles.previewImageWrapper}>
+                            <img
+                              src={URL.createObjectURL(photo)}
+                              alt={`Preview ${index}`}
+                              className={styles.previewImage}
+                              onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+                            />
+                            <button
+                              type="button"
+                              className={styles.removeImageBtn}
+                              onClick={() => handleRemovePhoto(index)}
+                            >
+                              <i className="fas fa-times"></i>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <small className={styles.formHint}>You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
+                  </div>
+
+                  <button type="submit" className={styles.submitBtn}>Post Donation</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {
+        showSuccessPopup && (
+          <div className={styles.popupContainer}>
+            <div className={`${styles.popupContent} ${styles.successPopup}`}>
+              <div className={styles.successIcon}>
+                <i className="fas fa-gift"></i>
+              </div>
+              <h2>Congratulations!</h2>
+              <p>You’ve successfully donated your waste materials! 🎉<br />
+                Please wait for others to claim your donation.
+              </p>
+              <button className={styles.continueBtn} onClick={handleClosePopup}>Continue</button>
+            </div>
+          </div>
+        )
+      }
+
+      {
+        showRequestPopup && selectedDonation && (
+          <div className={styles.popupContainer} onClick={(e) => {
+            if (e.target === e.currentTarget) handleClosePopup();
+          }}>
+            <div className={styles.popupContent}>
+              <button className={styles.closeBtn} onClick={handleClosePopup}>×</button>
+              <h2 style={{ color: '#2e7d32', marginBottom: '15px' }}>Request Materials</h2>
+
+              <form onSubmit={handleRequestSubmit}>
+                <div className={styles.formGroup}>
+                  <label>Waste:</label>
+                  <div style={{ fontWeight: 500, padding: '8px 0' }}>{selectedDonation.category} - {selectedDonation.subCategory}</div>
                 </div>
 
-                <button type="submit" className={styles.submitBtn}>Post Donation</button>
+                <div className={styles.formGroup}>
+                  <label>Available Items:</label>
+                  <div style={{ fontWeight: 500, padding: '8px 0' }}>{selectedDonation.quantity} {selectedDonation.unit}</div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="quantityClaim">Quantity to Claim:</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button type="button" onClick={() => adjustQuantity(-1)} style={{ width: '32px', height: '32px', border: 'none', background: '#f0f0f0', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>−</button>
+                    <input
+                      type="number"
+                      id="quantityClaim"
+                      name="quantityClaim"
+                      value={requestFormData.quantityClaim}
+                      onChange={handleRequestInputChange}
+                      min="1"
+                      className={styles.noSpinner}
+                      style={{ width: '60px', textAlign: 'center', border: '1.5px solid #ccc', borderRadius: '6px', padding: '6px' }}
+                    />
+                    <button type="button" onClick={() => adjustQuantity(1)} style={{ width: '32px', height: '32px', border: 'none', background: '#f0f0f0', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
+                  </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="projectId">Recycling Project:</label>
+                  <select id="projectId" name="projectId" required value={requestFormData.projectId} onChange={handleRequestInputChange}>
+                    <option value="">Select a project</option>
+                    {userProjects.map(p => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="urgencyLevel">Urgency Level:</label>
+                  <select id="urgencyLevel" name="urgencyLevel" required value={requestFormData.urgencyLevel} onChange={handleRequestInputChange}>
+                    <option value="High">High (Immediate Need)</option>
+                    <option value="Medium">Medium (Within 2 weeks)</option>
+                    <option value="Low">Low (Planning ahead)</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                  <button type="submit" className={styles.submitBtn}>Submit Request</button>
+                  <button type="button" className={styles.btn} style={{ background: '#f0f0f0', color: '#333', border: '1px solid #ddd' }} onClick={handleClosePopup}>Cancel</button>
+                </div>
               </form>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {showSuccessPopup && (
-        <div className={styles.popupContainer}>
-          <div className={`${styles.popupContent} ${styles.successPopup}`}>
-            <div className={styles.successIcon}>
-              <i className="fas fa-gift"></i>
+      {
+        showRequestSuccessPopup && (
+          <div className={styles.popupContainer}>
+            <div className={`${styles.popupContent} ${styles.successPopup}`}>
+              <div className={styles.successIcon}>
+                <i className="fas fa-check-circle"></i>
+              </div>
+              <h2>Request Sent!</h2>
+              <p>Your request has been submitted successfully.<br />Please wait for the donor&apos;s response.</p>
+              <button className={styles.continueBtn} onClick={handleClosePopup}>Continue</button>
             </div>
-            <h2>Congratulations!</h2>
-            <p>You’ve successfully donated your waste materials! 🎉<br />
-              Please wait for others to claim your donation.
-            </p>
-            <button className={styles.continueBtn} onClick={handleClosePopup}>Continue</button>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {showRequestPopup && selectedDonation && (
-        <div className={styles.popupContainer} onClick={(e) => {
-          if (e.target === e.currentTarget) handleClosePopup();
-        }}>
-          <div className={styles.popupContent}>
-            <button className={styles.closeBtn} onClick={handleClosePopup}>×</button>
-            <h2 style={{ color: '#2e7d32', marginBottom: '15px' }}>Request Materials</h2>
-
-            <form onSubmit={handleRequestSubmit}>
-              <div className={styles.formGroup}>
-                <label>Waste:</label>
-                <div style={{ fontWeight: 500, padding: '8px 0' }}>{selectedDonation.category} - {selectedDonation.subCategory}</div>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label>Available Items:</label>
-                <div style={{ fontWeight: 500, padding: '8px 0' }}>{selectedDonation.quantity} {selectedDonation.unit}</div>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label htmlFor="quantityClaim">Quantity to Claim:</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button type="button" onClick={() => adjustQuantity(-1)} style={{ width: '32px', height: '32px', border: 'none', background: '#f0f0f0', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>−</button>
-                  <input
-                    type="number"
-                    id="quantityClaim"
-                    name="quantityClaim"
-                    value={requestFormData.quantityClaim}
-                    onChange={handleRequestInputChange}
-                    min="1"
-                    className={styles.noSpinner}
-                    style={{ width: '60px', textAlign: 'center', border: '1.5px solid #ccc', borderRadius: '6px', padding: '6px' }}
-                  />
-                  <button type="button" onClick={() => adjustQuantity(1)} style={{ width: '32px', height: '32px', border: 'none', background: '#f0f0f0', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
-                </div>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label htmlFor="projectId">Recycling Project:</label>
-                <select id="projectId" name="projectId" required value={requestFormData.projectId} onChange={handleRequestInputChange}>
-                  <option value="">Select a project</option>
-                  {userProjects.map(p => (
-                    <option key={p.id} value={p.id}>{p.title}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label htmlFor="urgencyLevel">Urgency Level:</label>
-                <select id="urgencyLevel" name="urgencyLevel" required value={requestFormData.urgencyLevel} onChange={handleRequestInputChange}>
-                  <option value="High">High (Immediate Need)</option>
-                  <option value="Medium">Medium (Within 2 weeks)</option>
-                  <option value="Low">Low (Planning ahead)</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                <button type="submit" className={styles.submitBtn}>Submit Request</button>
-                <button type="button" className={styles.btn} style={{ background: '#f0f0f0', color: '#333', border: '1px solid #ddd' }} onClick={handleClosePopup}>Cancel</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showRequestSuccessPopup && (
-        <div className={styles.popupContainer}>
-          <div className={`${styles.popupContent} ${styles.successPopup}`}>
-            <div className={styles.successIcon}>
-              <i className="fas fa-check-circle"></i>
-            </div>
-            <h2>Request Sent!</h2>
-            <p>Your request has been submitted successfully.<br />Please wait for the donor&apos;s response.</p>
-            <button className={styles.continueBtn} onClick={handleClosePopup}>Continue</button>
-          </div>
-        </div>
-      )}
-
-      {showIdeaPopup && selectedIdea && (
-        <RecycledIdeaPopup
-          idea={selectedIdea}
-          onClose={handleCloseIdeaPopup}
-          onConfirm={handleConfirmIdea}
-        />
-      )}
+      {
+        showIdeaPopup && selectedIdea && (
+          <RecycledIdeaPopup
+            idea={selectedIdea}
+            onClose={handleCloseIdeaPopup}
+            onConfirm={handleConfirmIdea}
+          />
+        )
+      }
 
       {/* Feedback Button */}
       <div className={styles.feedbackBtn} onClick={() => setIsFeedbackOpen(true)}>💬</div>
 
       {/* Feedback Modal */}
-      {isFeedbackOpen && (
-        <div className={styles.feedbackModal} onClick={(e) => {
-          if (e.target === e.currentTarget) setIsFeedbackOpen(false);
-        }}>
-          <div className={styles.feedbackContent}>
-            <span className={styles.feedbackCloseBtn} onClick={() => setIsFeedbackOpen(false)}>×</span>
+      {
+        isFeedbackOpen && (
+          <div className={styles.feedbackModal} onClick={(e) => {
+            if (e.target === e.currentTarget) setIsFeedbackOpen(false);
+          }}>
+            <div className={styles.feedbackContent}>
+              <span className={styles.feedbackCloseBtn} onClick={() => setIsFeedbackOpen(false)}>×</span>
 
-            {!submitSuccess ? (
-              <div className={styles.feedbackForm}>
-                <h3>Share Your Feedback</h3>
-                <div className={styles.emojiRating}>
-                  {[
-                    { r: 1, e: '😞', l: 'Very Sad' },
-                    { r: 2, e: '😕', l: 'Sad' },
-                    { r: 3, e: '😐', l: 'Neutral' },
-                    { r: 4, e: '🙂', l: 'Happy' },
-                    { r: 5, e: '😍', l: 'Very Happy' }
-                  ].map((option) => (
-                    <div
-                      key={option.r}
-                      className={`${styles.emojiOption} ${rating === option.r ? styles.selected : ''}`}
-                      onClick={() => {
-                        setRating(option.r);
-                        setRatingError(false);
-                      }}
-                    >
-                      <span className={styles.emoji}>{option.e}</span>
-                      <span className={styles.emojiLabel}>{option.l}</span>
-                    </div>
-                  ))}
+              {!submitSuccess ? (
+                <div className={styles.feedbackForm}>
+                  <h3>Share Your Feedback</h3>
+                  <div className={styles.emojiRating}>
+                    {[
+                      { r: 1, e: '😞', l: 'Very Sad' },
+                      { r: 2, e: '😕', l: 'Sad' },
+                      { r: 3, e: '😐', l: 'Neutral' },
+                      { r: 4, e: '🙂', l: 'Happy' },
+                      { r: 5, e: '😍', l: 'Very Happy' }
+                    ].map((option) => (
+                      <div
+                        key={option.r}
+                        className={`${styles.emojiOption} ${rating === option.r ? styles.selected : ''}`}
+                        onClick={() => {
+                          setRating(option.r);
+                          setRatingError(false);
+                        }}
+                      >
+                        <span className={styles.emoji}>{option.e}</span>
+                        <span className={styles.emojiLabel}>{option.l}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {ratingError && <div className={styles.errorMessage} style={{ display: 'block' }}>Please select a rating</div>}
+
+                  <p className={styles.feedbackDetail}>Please share in detail what we can improve more?</p>
+                  <textarea
+                    placeholder="Your feedback helps us make EcoWaste better..."
+                    value={feedbackText}
+                    onChange={(e) => {
+                      setFeedbackText(e.target.value);
+                      setTextError(false);
+                    }}
+                  ></textarea>
+                  {textError && <div className={styles.errorMessage} style={{ display: 'block' }}>Please provide your feedback</div>}
+
+                  <button
+                    type="submit"
+                    className={styles.feedbackSubmitBtn}
+                    onClick={handleFeedbackSubmit}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        Submitting... <div className={styles.spinner}></div>
+                      </>
+                    ) : 'Submit Feedback'}
+                  </button>
                 </div>
-                {ratingError && <div className={styles.errorMessage} style={{ display: 'block' }}>Please select a rating</div>}
-
-                <p className={styles.feedbackDetail}>Please share in detail what we can improve more?</p>
-                <textarea
-                  placeholder="Your feedback helps us make EcoWaste better..."
-                  value={feedbackText}
-                  onChange={(e) => {
-                    setFeedbackText(e.target.value);
-                    setTextError(false);
-                  }}
-                ></textarea>
-                {textError && <div className={styles.errorMessage} style={{ display: 'block' }}>Please provide your feedback</div>}
-
-                <button
-                  type="submit"
-                  className={styles.feedbackSubmitBtn}
-                  onClick={handleFeedbackSubmit}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      Submitting... <div className={styles.spinner}></div>
-                    </>
-                  ) : 'Submit Feedback'}
-                </button>
-              </div>
-            ) : (
-              <div className={styles.thankYouMessage} style={{ display: 'block' }}>
-                <span className={styles.thankYouEmoji}>🎉</span>
-                <h3>Thank You!</h3>
-                <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
-                <p>Your opinion matters to us!</p>
-              </div>
-            )}
+              ) : (
+                <div className={styles.thankYouMessage} style={{ display: 'block' }}>
+                  <span className={styles.thankYouEmoji}>🎉</span>
+                  <h3>Thank You!</h3>
+                  <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
+                  <p>Your opinion matters to us!</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </ProtectedRoute>
+        )
+      }
+    </ProtectedRoute >
   );
 }
 

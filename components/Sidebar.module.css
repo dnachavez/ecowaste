@@ -9,7 +9,7 @@
 .sidebar {
   background: linear-gradient(180deg, var(--light-green) 0%, #e8f5e8 100%);
   padding: 30px 20px;
-  box-shadow: 5px 0 25px rgba(0,0,0,0.08);
+  box-shadow: 5px 0 25px rgba(0, 0, 0, 0.08);
   position: sticky;
   width: 250px;
   top: 90px;
@@ -18,6 +18,12 @@
   overflow: hidden;
   left: 0;
   border: 1px solid rgba(130, 170, 82, 0.2);
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    display: none;
+  }
 }
 
 .sidebar nav ul {

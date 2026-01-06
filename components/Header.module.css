@@ -349,6 +349,7 @@
   }
 }
 
+
 @keyframes gentle-spin {
   0% {
     transform: scale(1);
@@ -361,4 +362,155 @@
   100% {
     transform: scale(1);
   }
+}
+
+/* Mobile Menu Styles */
+.hamburgerBtn {
+  display: none;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 10px;
+}
+
+.mobileMenuOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  justify-content: flex-end;
+  animation: fadeIn 0.3s ease;
+}
+
+.mobileMenu {
+  width: 80%;
+  max-width: 300px;
+  background-color: white;
+  height: 100%;
+  padding: 20px;
+  box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.3s ease;
+}
+
+.mobileMenuHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 15px;
+}
+
+.mobileMenuHeader h2 {
+  margin: 0;
+  color: #82AA52;
+  font-size: 20px;
+}
+
+.closeMenuBtn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #666;
+  cursor: pointer;
+}
+
+.mobileNav {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.mobileNavLink {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px;
+  text-decoration: none;
+  color: #333;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+  font-size: 16px;
+}
+
+.mobileNavLink:hover {
+  background-color: #f6ffeb;
+  color: #82AA52;
+}
+
+.mobileNavLink i {
+  width: 25px;
+  text-align: center;
+  color: #82AA52;
+}
+
+.mobileDivider {
+  height: 1px;
+  background-color: #eee;
+  margin: 10px 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 900px) {
+  .hamburgerBtn {
+    display: block;
+    margin-left: 15px;
+  }
+
+  .logoContainer h1 {
+    display: block;
+    font-size: 18px !important;
+  }
+
+  .profileName,
+  .dropdownArrow {
+    display: none;
+  }
+
+  /* Hide the container for name and badge (2nd child of userProfile) */
+  .userProfile>div:nth-child(2) {
+    display: none !important;
+  }
+
+  /* Make logo smaller if needed */
+  .logo img {
+    height: 50px;
+    width: 50px;
+  }
+
+  .header {
+    height: 70px;
+  }
+
+  /* We might want to hide the user profile text or right section elements on very small screens, 
+     but keeping the profile icon visible is good. 
+     Perhaps hide the "EcoWaste" text if needed, or make logo smaller. */
 }

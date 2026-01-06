@@ -12,7 +12,12 @@ import { ref, onValue, push, set, get, query, orderByChild, equalTo } from 'fire
 
 import { useAuth } from '../../context/AuthContext';
 import { createNotification } from '../../lib/notifications';
-import RecycledIdeaPopup, { RecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
+import RecycledIdeaPopup, { RecycledIdea as BaseRecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
+import { calculateTimeAgo } from '../../lib/dateUtils';
+
+interface RecycledIdea extends BaseRecycledIdea {
+  authorId?: string;
+}
 
 interface Comment {
   id: string;
@@ -27,6 +32,7 @@ interface Donation {
   category: string;
   subCategory: string;
   timeAgo: string;
+  createdAt: string; // Added field
   quantity: string;
   unit: string;
   description: string;
@@ -122,24 +128,6 @@ function BrowseContent() {
   const [ratingError, setRatingError] = useState(false);
   const [textError, setTextError] = useState(false);
 
-  const calculateTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    let interval = seconds / 31536000;
-    if (interval > 1) return Math.floor(interval) + " years ago";
-    interval = seconds / 2592000;
-    if (interval > 1) return Math.floor(interval) + " months ago";
-    interval = seconds / 86400;
-    if (interval > 1) return Math.floor(interval) + " days ago";
-    interval = seconds / 3600;
-    if (interval > 1) return Math.floor(interval) + " hours ago";
-    interval = seconds / 60;
-    if (interval > 1) return Math.floor(interval) + " minutes ago";
-    return Math.floor(seconds) + " seconds ago";
-  };
-
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,6 +200,7 @@ function BrowseContent() {
             category: donation.category,
             subCategory: donation.subCategory,
             timeAgo: calculateTimeAgo(donation.createdAt),
+            createdAt: donation.createdAt, // Added mapping
             quantity: donation.quantity,
             unit: donation.unit || 'Units',
             description: donation.description,
@@ -463,6 +452,7 @@ function BrowseContent() {
             id: project.id,
             title: project.title,
             author: project.authorName || 'Anonymous',
+            authorId: project.authorId, // Added authorId
             timeAgo: project.createdAt,
             image: project.final_images ? project.final_images[0] : '',
             description: project.description,
@@ -595,11 +585,16 @@ function BrowseContent() {
                               {donation.user.name}
                             </Link>
                           </div>
-                          <div className={styles.donationMeta}>
+                          <div className={styles.donationMeta} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                             <span className={styles.category}>
                               Category: {donation.category} → {donation.subCategory}
                             </span>
-                            <span className={styles.timeAgo}>{donation.timeAgo}</span>
+                            <span style={{ color: '#888', fontSize: '0.9em' }}>
+                              Date: {new Date(donation.createdAt).toLocaleDateString()}
+                            </span>
+                            <span className={styles.timeAgo} style={{ fontSize: '0.8em', color: '#999', marginTop: '4px' }}>
+                              {donation.timeAgo}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -697,9 +692,22 @@ function BrowseContent() {
                 <div key={idea.id} className={styles.ideaCard}>
                   <div className={styles.ideaHeader}>
                     <h3>{idea.title}</h3>
-                    <div className={styles.ideaMeta}>
-                      <span className={styles.author}>{idea.author}</span>
-                      <span className={styles.timeAgo}>{idea.timeAgo}</span>
+                    <div className={styles.ideaMeta} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                      <span className={styles.author}>
+                        Project recycled by {idea.authorId ? (
+                          <Link href={`/profile/${idea.authorId}`} style={{ fontWeight: 'bold', color: '#82AA52', textDecoration: 'none' }}>
+                            {idea.author}
+                          </Link>
+                        ) : (
+                          <span style={{ fontWeight: 'bold', color: '#555' }}>{idea.author}</span>
+                        )}
+                        <span style={{ color: '#888', marginLeft: '8px', fontSize: '0.9em' }}>
+                          {new Date(idea.timeAgo).toLocaleDateString()}
+                        </span>
+                      </span>
+                      <div className={styles.timeAgo} style={{ fontSize: '0.8em', color: '#999', marginTop: '4px' }}>
+                        {calculateTimeAgo(idea.timeAgo)}
+                      </div>
                     </div>
                   </div>
                   <div className={styles.ideaImageContainer}>

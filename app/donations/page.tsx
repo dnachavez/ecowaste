@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Header from '../../components/Header';
+import { calculateTimeAgo } from '../../lib/dateUtils';
 import Sidebar from '../../components/Sidebar';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import styles from './donations.module.css';
@@ -704,9 +706,23 @@ export default function DonationsPage() {
                                                         <span className={`${styles['status-badge']} ${styles[`status-${request.status}`]}`}>{request.status}</span>
                                                     </div>
                                                     <div className={styles['row-meta']}>
-                                                        <div className={styles['meta-item']}>
-                                                            <i className="fas fa-user"></i>
-                                                            <span>{request.requesterName}</span>
+                                                        <div className={styles['meta-item']} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                            <div>
+                                                                <i className="fas fa-user" style={{ marginRight: '8px' }}></i>
+                                                                {request.requesterId ? (
+                                                                    <Link href={`/profile/${request.requesterId}`} style={{ fontWeight: 'bold', color: '#2e8b57', textDecoration: 'none' }}>
+                                                                        {request.requesterName}
+                                                                    </Link>
+                                                                ) : (
+                                                                    <span style={{ fontWeight: 'bold' }}>{request.requesterName}</span>
+                                                                )}
+                                                                <span style={{ color: '#888', marginLeft: '8px', fontSize: '0.9em' }}>
+                                                                    {new Date(request.createdAt).toLocaleDateString()}
+                                                                </span>
+                                                            </div>
+                                                            <div style={{ fontSize: '0.8em', color: '#999', marginTop: '2px', marginLeft: '24px' }}>
+                                                                {calculateTimeAgo(request.createdAt)}
+                                                            </div>
                                                         </div>
                                                         {request.projectTitle && (
                                                             <div className={styles['meta-item']}>
@@ -724,10 +740,6 @@ export default function DonationsPage() {
                                                                 <span>Urgency: {request.urgencyLevel}</span>
                                                             </div>
                                                         )}
-                                                        <div className={styles['meta-item']}>
-                                                            <i className="far fa-calendar-alt"></i>
-                                                            <span>{new Date(request.createdAt).toLocaleDateString()}</span>
-                                                        </div>
                                                     </div>
                                                     {(request.status === 'approved' || request.status === 'completed') && (
                                                         <div className={styles['delivery-info']} style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
@@ -817,9 +829,24 @@ export default function DonationsPage() {
                                                         <span className={`${styles['status-badge']} ${styles[`status-${request.status}`]}`}>{request.status}</span>
                                                     </div>
                                                     <div className={styles['row-meta']}>
-                                                        <div className={styles['meta-item']}>
-                                                            <i className="fas fa-user"></i>
-                                                            <span>Donor: {request.ownerName || 'Unknown'}</span>
+                                                        <div className={styles['meta-item']} style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                            <div>
+                                                                <i className="fas fa-user" style={{ marginRight: '8px' }}></i>
+                                                                <span style={{ fontWeight: 'normal', marginRight: '4px' }}>Donor:</span>
+                                                                {request.ownerId ? (
+                                                                    <Link href={`/profile/${request.ownerId}`} style={{ fontWeight: 'bold', color: '#2e8b57', textDecoration: 'none' }}>
+                                                                        {request.ownerName || 'Unknown'}
+                                                                    </Link>
+                                                                ) : (
+                                                                    <span style={{ fontWeight: 'bold' }}>{request.ownerName || 'Unknown'}</span>
+                                                                )}
+                                                                <span style={{ color: '#888', marginLeft: '8px', fontSize: '0.9em' }}>
+                                                                    {new Date(request.createdAt).toLocaleDateString()}
+                                                                </span>
+                                                            </div>
+                                                            <div style={{ fontSize: '0.8em', color: '#999', marginTop: '2px', marginLeft: '24px' }}>
+                                                                {calculateTimeAgo(request.createdAt)}
+                                                            </div>
                                                         </div>
                                                         {request.projectTitle && (
                                                             <div className={styles['meta-item']}>
@@ -836,10 +863,6 @@ export default function DonationsPage() {
                                                         <div className={styles['meta-item']}>
                                                             <i className="fas fa-cube"></i>
                                                             <span>Qty: {request.quantity}</span>
-                                                        </div>
-                                                        <div className={styles['meta-item']}>
-                                                            <i className="far fa-calendar-alt"></i>
-                                                            <span>{new Date(request.createdAt).toLocaleDateString()}</span>
                                                         </div>
                                                     </div>
                                                     {(request.status === 'approved' || request.status === 'completed') && (

@@ -1,26 +1,27 @@
 :root {
-  --primary-green: #82AA52;
-  --dark-green: #6d8f45;
-  --light-green: #F6FFEB;
-  --accent-green: #2e8b57;
+    --primary-green: #82AA52;
+    --dark-green: #6d8f45;
+    --light-green: #F6FFEB;
+    --accent-green: #2e8b57;
 }
 
 .container {
-  display: grid;
-  grid-template-columns: 250px 1fr;
-  max-width: 1200px;
-  margin: 0 auto;
-  align-items: flex-start;
-  min-height: 100vh;
-  background-color: #f8f9fa;
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    max-width: 1200px;
+    margin: 0 auto;
+    align-items: flex-start;
+    min-height: 100vh;
+    background-color: #f8f9fa;
 }
 
 .donations-container {
     background-color: white;
     border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
     padding: 20px;
-    width: 100%; /* Ensure it fills the grid cell */
+    width: 100%;
+    /* Ensure it fills the grid cell */
 }
 
 .page-header {
@@ -47,14 +48,17 @@
 .tab-content-wrapper::-webkit-scrollbar {
     width: 8px;
 }
+
 .tab-content-wrapper::-webkit-scrollbar-track {
     background: #f6ffeb;
     border-radius: 10px;
 }
+
 .tab-content-wrapper::-webkit-scrollbar-thumb {
     background: #82AA52;
     border-radius: 10px;
 }
+
 .tab-content-wrapper::-webkit-scrollbar-thumb:hover {
     background: #6d8f45;
 }
@@ -79,7 +83,7 @@
 }
 
 .donation-row:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
     border-color: #82AA52;
     transform: translateY(-1px);
 }
@@ -168,7 +172,8 @@
     text-transform: capitalize;
 }
 
-.status-completed, .status-approved {
+.status-completed,
+.status-approved {
     background-color: #82AA52;
 }
 
@@ -228,7 +233,7 @@
     color: #666;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     grid-column: 1 / -1;
 }
 
@@ -243,6 +248,38 @@
     color: #777;
 }
 
+@media (max-width: 900px) {
+    .container {
+        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Hide sidebar on mobile */
+    /* Sidebar is the first child in container grid, we can target it via :first-child if no class, 
+     but better to assume Sidebar component structure. 
+     In page.tsx: <Sidebar /> is first. Sidebar.module.css has .sidebar class. 
+     Since we can't easily target a child component class from parent module without global,
+     we rely on grid column adjustments or just hiding it if we can target it. 
+     However, React modules scope classes. 
+     
+     In app/donations/page.tsx:
+     <Sidebar /> is a sibling to main.donations-container
+     Since we can't style Sidebar from here (module isolation), 
+     we should rely on the Sidebar component ITSELF to hide on mobile using a media query in Sidebar.module.css
+     OR we can try to hide the first child of .container if we are desperate.
+     
+     Actually, let's update Sidebar.module.css to hide itself on mobile! 
+     That is cleaner.
+     
+     For here, we just need to ensure the container behaves as 1 col.
+  */
+
+    .donations-container {
+        width: 100%;
+    }
+}
+
 /* Responsive fixes */
 @media (max-width: 768px) {
     .donation-row {
@@ -250,12 +287,12 @@
         align-items: flex-start;
         gap: 12px;
     }
-    
+
     .row-image {
         width: 100%;
         height: 150px;
     }
-    
+
     .row-actions {
         width: 100%;
         margin-left: 0;
@@ -292,7 +329,8 @@
     border-bottom: 3px solid transparent;
     transition: all 0.3s;
     white-space: nowrap;
-    flex-shrink: 0; /* Prevent tabs from shrinking */
+    flex-shrink: 0;
+    /* Prevent tabs from shrinking */
     background: none;
     border-top: none;
     border-left: none;
@@ -425,8 +463,15 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Feedback Button Styles */
@@ -444,7 +489,7 @@
     justify-content: center;
     font-size: 28px;
     cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
     z-index: 100;
     transition: all 0.3s ease;
 }
@@ -462,7 +507,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0, 0, 0, 0.5);
     z-index: 2000;
     justify-content: center;
     align-items: center;
@@ -474,7 +519,7 @@
     border-radius: 8px;
     width: 90%;
     max-width: 500px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     position: relative;
     z-index: 2001;
 }
@@ -586,7 +631,7 @@
 
 /* Error message */
 .errorMessage {
-    color: #e74c3c;     
+    color: #e74c3c;
     font-size: 13px;
     margin-top: 5px;
     display: none;
@@ -597,7 +642,7 @@
     display: inline-block;
     width: 20px;
     height: 20px;
-    border: 3px solid rgba(255,255,255,0.3);
+    border: 3px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
     border-top-color: white;
     animation: spin 1s ease-in-out infinite;
@@ -605,7 +650,9 @@
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Modal Styles */
@@ -671,4 +718,3 @@
     border-radius: 4px;
     cursor: pointer;
 }
-
