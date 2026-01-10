@@ -11,6 +11,7 @@ import styles from './homepage.module.css';
 import { db } from '../../lib/firebase';
 import { ref, onValue, push, runTransaction, update, get } from 'firebase/database'; // Added update
 import { getUserDisplayAvatar, incrementAction } from '../../lib/gamification';
+import { createNotification } from '../../lib/notifications';
 import { calculateTimeAgo } from '../../lib/dateUtils';
 
 import RecycledIdeaPopup, { RecycledIdea as BaseRecycledIdea, ProjectMaterial, Step } from '../../components/RecycledIdeaPopup';
@@ -371,7 +372,18 @@ function HomepageContent() {
       };
 
       const requestsRef = ref(db, 'requests');
-      await push(requestsRef, requestData);
+      const newRequestRef = await push(requestsRef, requestData);
+
+      // Notify the donor
+      if (selectedDonation.user.id && selectedDonation.user.id !== user.uid) {
+        await createNotification(
+          selectedDonation.user.id,
+          "New Donation Request",
+          `${user.displayName || 'A user'} requested ${requestFormData.quantityClaim} ${selectedDonation.unit || 'units'} of your ${selectedDonation.category} donation.`,
+          'info',
+          newRequestRef.key || undefined
+        );
+      }
 
       setShowRequestPopup(false);
       setShowRequestSuccessPopup(true);
